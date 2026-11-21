@@ -1,0 +1,1916 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>ライトカーテン光軸・目視アライメント支援ツール (15mズーム対応)</title>
+  <style>
+    /* ==========================================================================
+       産業FA・高コントラストダークテーマ
+       工場照明下での視認性と片手操作のしやすさ（最小タップ領域44px）を重視
+       ========================================================================== */
+    :root {
+      --bg-base: #0b0f14;
+      --bg-panel: #121822;
+      --bg-card: #17202e;
+      --bg-input: #090d13;
+      --bg-hover: #212e42;
+      --border-subtle: #29384d;
+      --border-strong: #415675;
+
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+
+      --accent-cyan: #00e5ff;
+      --accent-green: #00e676;
+      --accent-amber: #ffab00;
+      --accent-red: #ff3d57;
+
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      overflow-x: hidden;
+    }
+
+    /* ==========================================================================
+       ヘッダーバー
+       ========================================================================== */
+    .app-header {
+      background: #0e131c;
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 10px 14px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .header-inner {
+      max-width: 1320px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .brand-badge {
+      background: rgba(0, 229, 255, 0.14);
+      border: 1px solid var(--accent-cyan);
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 7px;
+      border-radius: 5px;
+      white-space: nowrap;
+    }
+
+    .brand-title {
+      font-size: 14.5px;
+      font-weight: 800;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .top-btn {
+      min-height: 40px;
+      padding: 6px 11px;
+      border-radius: 8px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .top-btn:active {
+      transform: scale(0.97);
+    }
+
+    .top-btn.is-active {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 229, 255, 0.16);
+      color: var(--accent-cyan);
+    }
+
+    /* ==========================================================================
+       メイングリッド（モバイル1カラム / デスクトップ2ペイン）
+       ========================================================================== */
+    .main-grid {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    @media (min-width: 980px) {
+      .main-grid {
+        grid-template-columns: 1.35fr 1fr;
+        padding: 16px;
+        gap: 18px;
+        align-items: start;
+      }
+    }
+
+    /* HUD全画面拡大モード */
+    body.hud-expanded .controls-column {
+      display: none;
+    }
+
+    body.hud-expanded .main-grid {
+      grid-template-columns: 1fr;
+    }
+
+    body.hud-expanded .viewport-stage {
+      aspect-ratio: auto;
+      height: calc(100dvh - 132px);
+      max-height: none;
+    }
+
+    /* ==========================================================================
+       ビューポート（カメラ＋HUD＋拡大ルーペPIP）
+       ========================================================================== */
+    .viewport-column {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .viewport-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      min-height: 360px;
+      max-height: 74dvh;
+      background: #05070a;
+      border: 2px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      touch-action: none; /* ピンチズーム＆パン操作用 */
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+    }
+
+    @media (min-width: 768px) {
+      .viewport-stage {
+        aspect-ratio: 4 / 3;
+        max-height: 68dvh;
+      }
+    }
+
+    #cameraVideo {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    #mainCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+
+    #mainCanvas:active {
+      cursor: grabbing;
+    }
+
+    /* ビューポート左上テレメトリチップ */
+    .hud-top-left {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 5px;
+      pointer-events: none;
+      z-index: 15;
+      max-width: calc(100% - 146px);
+    }
+
+    .hud-chip {
+      background: rgba(11, 15, 20, 0.85);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+
+    .hud-chip.ok { border-color: var(--accent-green); color: var(--accent-green); }
+    .hud-chip.warn { border-color: var(--accent-amber); color: var(--accent-amber); }
+    .hud-chip.err { border-color: var(--accent-red); color: var(--accent-red); }
+
+    /* カメラ未起動・フォールバック案内バー */
+    .camera-banner {
+      position: absolute;
+      bottom: 52px;
+      left: 10px;
+      right: 10px;
+      background: rgba(11, 15, 20, 0.94);
+      border: 1px solid var(--accent-amber);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      z-index: 25;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .camera-banner.hidden {
+      display: none;
+    }
+
+    .camera-banner p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .camera-banner-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* クイック操作ドック */
+    .quick-dock {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .dock-btn {
+      min-height: 48px;
+      padding: 6px 4px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-strong);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      text-align: center;
+    }
+
+    .dock-btn:active {
+      transform: scale(0.97);
+    }
+
+    .dock-btn.accent-cyan {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 229, 255, 0.14);
+      color: var(--accent-cyan);
+    }
+
+    .dock-btn.accent-green {
+      border-color: var(--accent-green);
+      background: var(--accent-green);
+      color: #03150b;
+      font-weight: 800;
+    }
+
+    .dock-sub {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      opacity: 0.88;
+    }
+
+    /* ==========================================================================
+       右（下部）コントロールパネル群
+       ========================================================================== */
+    .controls-column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--accent-cyan);
+      margin: 0;
+      letter-spacing: 0.02em;
+    }
+
+    .val-badge {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--accent-cyan);
+      background: var(--bg-input);
+      border: 1px solid var(--border-strong);
+      padding: 2px 9px;
+      border-radius: 6px;
+    }
+
+    .val-badge.amber {
+      color: var(--accent-amber);
+    }
+
+    /* スライダー＆ステップボタン */
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .step-btn {
+      min-width: 46px;
+      min-height: 46px;
+      padding: 0 8px;
+      border-radius: 9px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    .step-btn:active {
+      background: var(--accent-cyan);
+      color: #050a10;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      border: 2px solid #ffffff;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      border: 2px solid #ffffff;
+      cursor: pointer;
+    }
+
+    /* プリセットチップ行 */
+    .chip-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+
+    .chip-row.cols-4 {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .preset-chip {
+      min-height: 42px;
+      padding: 4px 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .preset-chip.selected {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 229, 255, 0.16);
+      color: var(--text-primary);
+    }
+
+    /* 光学計算テレメトリカード */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin-top: 10px;
+    }
+
+    .metric-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 8px 9px;
+    }
+
+    .metric-label {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .metric-val {
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    /* 物理オフセットパッド */
+    .offset-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+
+    .offset-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .offset-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+
+    .offset-pad {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    /* レチクル色スイッチャー */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .color-btn {
+      min-height: 44px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .color-btn.selected {
+      border-width: 2px;
+      border-color: #ffffff;
+      background: var(--bg-hover);
+    }
+
+    .color-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .action-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .full-btn {
+      min-height: 46px;
+      padding: 8px 10px;
+      border-radius: 9px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .full-btn:active {
+      transform: scale(0.98);
+    }
+
+    .full-btn.active {
+      border-color: var(--accent-green);
+      background: rgba(0, 230, 118, 0.16);
+      color: var(--accent-green);
+    }
+
+    /* トースト通知 */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--accent-green);
+      color: #03150b;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 11px 20px;
+      border-radius: 999px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.22s ease;
+      z-index: 100;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <!-- ヘッダー -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-badge">LC ALIGN 15M</span>
+        <h1 class="brand-title">ライトカーテン光軸・目視アライメント支援</h1>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="demoModeBtn" class="top-btn" title="カメラなしの15m模擬受光器映像切替">
+          <span>🎛️ デモ映像</span>
+        </button>
+        <button type="button" id="expandHudBtn" class="top-btn" title="操作パネルを折りたたんで画面拡大">
+          <span id="expandHudLabel">⛶ HUD拡大</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-grid">
+    <!-- 左（モバイル上部）：カメラ＆拡大ルーペPIP＆照準ビューポート -->
+    <section class="viewport-column" aria-label="光軸照準ビューポート">
+      <div class="viewport-stage" id="viewportStage">
+        <video id="cameraVideo" playsinline autoplay muted></video>
+        <canvas id="mainCanvas"></canvas>
+
+        <!-- 左上リアルタイムステータス -->
+        <div class="hud-top-left">
+          <span class="hud-chip" id="hudStatusChip">CAM: インカメラ | 正像 | 5.0x</span>
+          <span class="hud-chip" id="hudGeomChip">L: 15.0m | W: 30mm | パララックス: 0.095°</span>
+          <span class="hud-chip ok" id="hudLevelChip">傾斜: R 0.0° / P 0.0°</span>
+        </div>
+
+        <!-- カメラ起動／デモ切替案内 -->
+        <div class="camera-banner" id="cameraBanner">
+          <p id="cameraBannerMsg">
+            投光面にスマホを密着させ、インカメラで受光器を捉えてください。カメラが使えない環境（PC等）では「デモ映像モード」で15m先の受光器を模擬テストできます。
+          </p>
+          <div class="camera-banner-btns">
+            <button type="button" id="startCamBtn" class="top-btn" style="background:var(--accent-green); color:#03150b; border-color:#69f0ae;">
+              📷 インカメラ起動
+            </button>
+            <button type="button" id="startDemoBtn" class="top-btn">
+              🎛️ デモ映像モードで試す
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- クイック操作ドック -->
+      <div class="quick-dock" role="toolbar" aria-label="クイック操作">
+        <button type="button" id="mirrorToggleBtn" class="dock-btn accent-cyan">
+          <span id="mirrorTitle">正像表示</span>
+          <span id="mirrorSub" class="dock-sub">左右そのまま</span>
+        </button>
+
+        <button type="button" id="facingToggleBtn" class="dock-btn">
+          <span id="facingTitle">インカメラ</span>
+          <span class="dock-sub">前後カメラ切替</span>
+        </button>
+
+        <button type="button" id="panResetBtn" class="dock-btn">
+          <span>パン中央戻し</span>
+          <span class="dock-sub">視点リセット</span>
+        </button>
+
+        <button type="button" id="snapshotBtn" class="dock-btn accent-green">
+          <span>📸 PNG保存</span>
+          <span class="dock-sub">ルーペ・数値付</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 右（モバイル下部）：ズーム・筐体幅W・距離L・物理オフセット設定 -->
+    <div class="controls-column">
+      <!-- 1. デジタルズーム＆10倍ルーペ設定 -->
+      <section class="panel" aria-label="デジタルズーム設定">
+        <div class="panel-head">
+          <h2 class="panel-title">1. デジタルズーム (最大10.0x / 15m対応)</h2>
+          <span id="zoomBadge" class="val-badge">5.0x</span>
+        </div>
+
+        <div class="control-row">
+          <button type="button" id="zoomDecBtn" class="step-btn" aria-label="ズーム縮小">-0.1</button>
+          <input type="range" id="zoomSlider" min="1.0" max="10.0" step="0.1" value="5.0" />
+          <button type="button" id="zoomIncBtn" class="step-btn" aria-label="ズーム拡大">+0.1</button>
+        </div>
+
+        <div class="chip-row" id="zoomPresetRow">
+          <button type="button" class="preset-chip" data-zoom="1.0">1.0x</button>
+          <button type="button" class="preset-chip" data-zoom="3.0">3.0x</button>
+          <button type="button" class="preset-chip selected" data-zoom="5.0">5.0x</button>
+          <button type="button" class="preset-chip" data-zoom="8.0">8.0x</button>
+          <button type="button" class="preset-chip" data-zoom="10.0">10.0x</button>
+        </div>
+      </section>
+
+      <!-- 2. 既知の筐体幅 W・距離 L・カメラ画角 FOV -->
+      <section class="panel" aria-label="既知の筐体幅と距離設定">
+        <div class="panel-head">
+          <h2 class="panel-title">2. 既知の筐体幅 (W) ＆ 投受光間距離 (L)</h2>
+          <span id="widthBadge" class="val-badge">W: 30mm</span>
+        </div>
+
+        <!-- 筐体幅 W (mm) -->
+        <div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--text-secondary);">
+          受光器 筐体幅 W (mm)
+        </div>
+        <div class="control-row">
+          <button type="button" id="wDecBtn" class="step-btn">-1</button>
+          <input type="range" id="widthSlider" min="14" max="60" step="1" value="30" />
+          <button type="button" id="wIncBtn" class="step-btn">+1</button>
+        </div>
+        <div class="chip-row cols-4" id="widthPresetRow" style="margin-bottom:12px;">
+          <button type="button" class="preset-chip" data-w="24">24mm</button>
+          <button type="button" class="preset-chip" data-w="28">28mm</button>
+          <button type="button" class="preset-chip selected" data-w="30">30mm</button>
+          <button type="button" class="preset-chip" data-w="35">35mm</button>
+        </div>
+
+        <!-- 投受光間距離 L (m) -->
+        <div class="panel-head" style="margin-top:8px; margin-bottom:6px;">
+          <span style="font-size:12px; font-weight:700; color:var(--text-secondary);">投受光間距離 L (0.5m 〜 15.0m)</span>
+          <span id="distBadge" class="val-badge">L: 15.0m</span>
+        </div>
+        <div class="control-row">
+          <button type="button" id="lDecBtn" class="step-btn">-0.5</button>
+          <input type="range" id="distSlider" min="0.5" max="15.0" step="0.5" value="15.0" />
+          <button type="button" id="lIncBtn" class="step-btn">+0.5</button>
+        </div>
+        <div class="chip-row cols-4" id="distPresetRow" style="margin-bottom:12px;">
+          <button type="button" class="preset-chip" data-l="1.0">1.0m</button>
+          <button type="button" class="preset-chip" data-l="5.0">5.0m</button>
+          <button type="button" class="preset-chip" data-l="10.0">10.0m</button>
+          <button type="button" class="preset-chip selected" data-l="15.0">15.0m</button>
+        </div>
+
+        <!-- カメラ水平画角 FOV -->
+        <div class="panel-head" style="margin-top:8px; margin-bottom:6px;">
+          <span style="font-size:12px; font-weight:700; color:var(--text-secondary);">カメラ水平画角 (FOV)</span>
+          <span id="fovBadge" class="val-badge">65°</span>
+        </div>
+        <div class="control-row" style="margin-bottom:4px;">
+          <button type="button" id="fovDecBtn" class="step-btn">-1°</button>
+          <input type="range" id="fovSlider" min="50" max="85" step="1" value="65" />
+          <button type="button" id="fovIncBtn" class="step-btn">+1°</button>
+        </div>
+
+        <!-- リアルタイム光学スケール算出結果 -->
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <span class="metric-label">パララックス角度差</span>
+            <span id="metricParallax" class="metric-val">0.095°</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">距離Lでのスケール</span>
+            <span id="metricScale" class="metric-val">9.96 mm/px</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">画面上の筐体幅目安</span>
+            <span id="metricApparentW" class="metric-val">15.1 px</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. 物理オフセット (ΔX, ΔY mm) 動的照準補正 -->
+      <section class="panel" aria-label="物理オフセット補正">
+        <div class="panel-head">
+          <h2 class="panel-title">3. カメラ〜投光中心の物理ズレ補正 (mm)</h2>
+          <button type="button" id="resetOffsetBtn" class="step-btn" style="width:auto; min-height:36px; font-size:11.5px;">
+            リセット
+          </button>
+        </div>
+        <p style="font-size:11.5px; color:var(--text-muted); margin:0 0 10px 0; line-height:1.45;">
+          スマホのインカメラ中心と投光器光学中心の物理ズレ(mm)を設定すると、距離L・ズーム倍率に応じて照準位置を自動シフトします。
+        </p>
+
+        <div class="offset-card">
+          <div class="offset-card-head">
+            <span>水平物理ズレ ΔX (mm)</span>
+            <span id="dxBadge" class="val-badge amber">0 mm</span>
+          </div>
+          <div class="offset-pad">
+            <button type="button" class="step-btn" data-offset="dx" data-step="-5">-5</button>
+            <button type="button" class="step-btn" data-offset="dx" data-step="-1">-1</button>
+            <button type="button" class="step-btn" data-offset="dx" data-step="1">+1</button>
+            <button type="button" class="step-btn" data-offset="dx" data-step="5">+5</button>
+          </div>
+        </div>
+
+        <div class="offset-card">
+          <div class="offset-card-head">
+            <span>垂直物理ズレ ΔY (mm)</span>
+            <span id="dyBadge" class="val-badge amber">+25 mm</span>
+          </div>
+          <div class="offset-pad">
+            <button type="button" class="step-btn" data-offset="dy" data-step="-5">-5</button>
+            <button type="button" class="step-btn" data-offset="dy" data-step="-1">-1</button>
+            <button type="button" class="step-btn" data-offset="dy" data-step="1">+1</button>
+            <button type="button" class="step-btn" data-offset="dy" data-step="5">+5</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. レチクル色・ルーペPIP・傾斜水準器 -->
+      <section class="panel" aria-label="照準色と傾斜水準器設定">
+        <div class="panel-head">
+          <h2 class="panel-title">4. 高視認レチクル色 ＆ 傾斜水準器</h2>
+          <span id="gyroStateLabel" style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">
+            傾斜: 待機中
+          </span>
+        </div>
+
+        <div class="color-grid" id="reticleColorGroup">
+          <button type="button" class="color-btn selected" data-color="#00e5ff">
+            <span class="color-dot" style="background:#00e5ff;"></span>シアン
+          </button>
+          <button type="button" class="color-btn" data-color="#00e676">
+            <span class="color-dot" style="background:#00e676;"></span>蛍光緑
+          </button>
+          <button type="button" class="color-btn" data-color="#ffea00">
+            <span class="color-dot" style="background:#ffea00;"></span>イエロー
+          </button>
+          <button type="button" class="color-btn" data-color="#ff3d57">
+            <span class="color-dot" style="background:#ff3d57;"></span>レッド
+          </button>
+        </div>
+
+        <div class="action-grid-2" style="margin-bottom:8px;">
+          <button type="button" id="toggleLoupeBtn" class="full-btn active">
+            <span>🔍 10xルーペPIP: ON</span>
+          </button>
+          <button type="button" id="toggleGridBtn" class="full-btn active">
+            <span>▦ 補助グリッド: ON</span>
+          </button>
+        </div>
+
+        <div class="action-grid-2">
+          <button type="button" id="enableGyroBtn" class="full-btn">
+            <span>🧭 傾斜センサー有効化</span>
+          </button>
+          <button type="button" id="zeroGyroBtn" class="full-btn">
+            <span>🎯 傾斜ゼロ点補正</span>
+          </button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- トースト通知 -->
+  <div id="toast" class="toast" role="status" aria-live="polite">PNG画像を保存しました</div>
+
+  <script>
+    /**
+     * ライトカーテン光軸・目視アライメント支援ツール (15m対応)
+     * - インカメラ正像/ミラー切替 & 15m模擬受光器デモ映像モード
+     * - デジタルズーム (1.0x〜10.0x) + ピンチズーム/ドラッグパン + 10x中心ルーペPIP
+     * - 既知の筐体幅 W(mm) / 距離 L(m) / 物理オフセット ΔX, ΔY(mm) による動的目安枠描画
+     */
+    (function () {
+      'use strict';
+
+      const STORAGE_KEY = 'lc_align_15m_settings_v1';
+
+      // ======================================================================
+      // アプリケーション状態
+      // ======================================================================
+      const state = {
+        facingMode: 'user',       // 'user' (インカメラ) | 'environment' (背面カメラ)
+        isMirrored: false,        // デフォルトは受光器側から見て直感的な正像
+        zoom: 5.0,                // デジタルズーム倍率 (1.0 〜 10.0)
+        panX: 0,                  // ビューポートパンX (CSS px)
+        panY: 0,                  // ビューポートパンY (CSS px)
+
+        // 既知の物理寸法・光学パラメータ
+        housingWidthMm: 30,       // 受光器筐体幅 W (mm)
+        distanceM: 15.0,          // 投受光間距離 L (0.5m 〜 15.0m)
+        fovDeg: 65,               // カメラ水平画角 FOV (°)
+        offsetXmm: 0,             // カメラ〜投光中心 水平物理ズレ ΔX (mm)
+        offsetYmm: 25,            // カメラ〜投光中心 垂直物理ズレ ΔY (mm)
+
+        // HUD表示設定
+        reticleColor: '#00e5ff',
+        showLoupe: true,
+        showGrid: true,
+
+        // カメラ・デモ状態
+        stream: null,
+        cameraActive: false,
+        demoMode: false,
+
+        // 傾斜センサー状態
+        gyroEnabled: false,
+        rawRoll: 0,
+        rawPitch: 0,
+        zeroRoll: 0,
+        zeroPitch: 0
+      };
+
+      // 永続化設定の復元
+      function loadSettings() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return;
+          const s = JSON.parse(raw);
+          if (typeof s.housingWidthMm === 'number') state.housingWidthMm = s.housingWidthMm;
+          if (typeof s.distanceM === 'number') state.distanceM = s.distanceM;
+          if (typeof s.fovDeg === 'number') state.fovDeg = s.fovDeg;
+          if (typeof s.offsetXmm === 'number') state.offsetXmm = s.offsetXmm;
+          if (typeof s.offsetYmm === 'number') state.offsetYmm = s.offsetYmm;
+          if (typeof s.reticleColor === 'string') state.reticleColor = s.reticleColor;
+          if (typeof s.isMirrored === 'boolean') state.isMirrored = s.isMirrored;
+          if (typeof s.showLoupe === 'boolean') state.showLoupe = s.showLoupe;
+          if (typeof s.showGrid === 'boolean') state.showGrid = s.showGrid;
+        } catch (e) {
+          // 無視
+        }
+      }
+
+      function saveSettings() {
+        try {
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              housingWidthMm: state.housingWidthMm,
+              distanceM: state.distanceM,
+              fovDeg: state.fovDeg,
+              offsetXmm: state.offsetXmm,
+              offsetYmm: state.offsetYmm,
+              reticleColor: state.reticleColor,
+              isMirrored: state.isMirrored,
+              showLoupe: state.showLoupe,
+              showGrid: state.showGrid
+            })
+          );
+        } catch (e) {
+          // 無視
+        }
+      }
+
+      // ======================================================================
+      // DOM参照キャッシュ
+      // ======================================================================
+      const els = {
+        viewportStage: document.getElementById('viewportStage'),
+        cameraVideo: document.getElementById('cameraVideo'),
+        mainCanvas: document.getElementById('mainCanvas'),
+        hudStatusChip: document.getElementById('hudStatusChip'),
+        hudGeomChip: document.getElementById('hudGeomChip'),
+        hudLevelChip: document.getElementById('hudLevelChip'),
+
+        cameraBanner: document.getElementById('cameraBanner'),
+        cameraBannerMsg: document.getElementById('cameraBannerMsg'),
+        startCamBtn: document.getElementById('startCamBtn'),
+        startDemoBtn: document.getElementById('startDemoBtn'),
+
+        demoModeBtn: document.getElementById('demoModeBtn'),
+        expandHudBtn: document.getElementById('expandHudBtn'),
+        expandHudLabel: document.getElementById('expandHudLabel'),
+
+        mirrorToggleBtn: document.getElementById('mirrorToggleBtn'),
+        mirrorTitle: document.getElementById('mirrorTitle'),
+        mirrorSub: document.getElementById('mirrorSub'),
+        facingToggleBtn: document.getElementById('facingToggleBtn'),
+        facingTitle: document.getElementById('facingTitle'),
+        panResetBtn: document.getElementById('panResetBtn'),
+        snapshotBtn: document.getElementById('snapshotBtn'),
+
+        zoomBadge: document.getElementById('zoomBadge'),
+        zoomSlider: document.getElementById('zoomSlider'),
+        zoomDecBtn: document.getElementById('zoomDecBtn'),
+        zoomIncBtn: document.getElementById('zoomIncBtn'),
+
+        widthBadge: document.getElementById('widthBadge'),
+        widthSlider: document.getElementById('widthSlider'),
+        wDecBtn: document.getElementById('wDecBtn'),
+        wIncBtn: document.getElementById('wIncBtn'),
+
+        distBadge: document.getElementById('distBadge'),
+        distSlider: document.getElementById('distSlider'),
+        lDecBtn: document.getElementById('lDecBtn'),
+        lIncBtn: document.getElementById('lIncBtn'),
+
+        fovBadge: document.getElementById('fovBadge'),
+        fovSlider: document.getElementById('fovSlider'),
+        fovDecBtn: document.getElementById('fovDecBtn'),
+        fovIncBtn: document.getElementById('fovIncBtn'),
+
+        metricParallax: document.getElementById('metricParallax'),
+        metricScale: document.getElementById('metricScale'),
+        metricApparentW: document.getElementById('metricApparentW'),
+
+        dxBadge: document.getElementById('dxBadge'),
+        dyBadge: document.getElementById('dyBadge'),
+        resetOffsetBtn: document.getElementById('resetOffsetBtn'),
+
+        gyroStateLabel: document.getElementById('gyroStateLabel'),
+        toggleLoupeBtn: document.getElementById('toggleLoupeBtn'),
+        toggleGridBtn: document.getElementById('toggleGridBtn'),
+        enableGyroBtn: document.getElementById('enableGyroBtn'),
+        zeroGyroBtn: document.getElementById('zeroGyroBtn'),
+
+        toast: document.getElementById('toast')
+      };
+
+      const ctx = els.mainCanvas.getContext('2d');
+
+      // 映像ソース専用オフスクリーンキャンバス（ルーペ切り出し用）
+      const sourceCanvas = document.createElement('canvas');
+      const sourceCtx = sourceCanvas.getContext('2d');
+
+      // ======================================================================
+      // 光学ジオメトリ＆スケール計算
+      // ======================================================================
+      function computeOpticalGeometry(viewWidthPx) {
+        const L_mm = state.distanceM * 1000;
+        const halfFovRad = ((state.fovDeg / 2) * Math.PI) / 180;
+
+        // 1x時の距離Lにおける画面水平全幅 (mm)
+        const sceneFullWidthMm1x = 2 * L_mm * Math.tan(halfFovRad);
+
+        // 1x基準 (1920px相当基準および現在のビューポート幅基準)
+        const mmPerPxBase = sceneFullWidthMm1x / Math.max(1, viewWidthPx);
+        const mmPerPxZoomed = mmPerPxBase / state.zoom;
+
+        // 1920px基準でのmm/px（スペック表示目安）
+        const mmPerPx1920 = sceneFullWidthMm1x / 1920;
+
+        // パララックス角度差 θ = atan(sqrt(ΔX^2 + ΔY^2) / L_mm)
+        const radialOffsetMm = Math.hypot(state.offsetXmm, state.offsetYmm);
+        const parallaxDeg = (Math.atan2(radialOffsetMm, L_mm) * 180) / Math.PI;
+
+        // 画面上での受光器筐体幅 W の見かけ幅 (px)
+        const apparentWidthPx = state.housingWidthMm / Math.max(0.0001, mmPerPxZoomed);
+
+        // 物理オフセット (ΔX, ΔY mm) の画面ピクセルシフト量
+        // 正像表示時はカメラ右側の投光軸に合わせて照準もシフト
+        const shiftXPx = (state.isMirrored ? -state.offsetXmm : state.offsetXmm) / Math.max(0.0001, mmPerPxZoomed);
+        const shiftYPx = state.offsetYmm / Math.max(0.0001, mmPerPxZoomed);
+
+        return {
+          L_mm,
+          sceneFullWidthMm1x,
+          mmPerPxZoomed,
+          mmPerPx1920,
+          parallaxDeg,
+          apparentWidthPx,
+          shiftXPx,
+          shiftYPx
+        };
+      }
+
+      // ======================================================================
+      // 15m模擬受光器デモ映像描画
+      // ======================================================================
+      function drawDemoScene(targetCtx, width, height, timeMs) {
+        // 工場建屋内の奥行き背景
+        const bg = targetCtx.createLinearGradient(0, 0, 0, height);
+        bg.addColorStop(0, '#0f141d');
+        bg.addColorStop(0.55, '#192231');
+        bg.addColorStop(1, '#0b0f16');
+        targetCtx.fillStyle = bg;
+        targetCtx.fillRect(0, 0, width, height);
+
+        // 遠くの柱・安全柵フレーム
+        targetCtx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
+        targetCtx.lineWidth = 1.5;
+        for (let i = -3; i <= 3; i++) {
+          const gx = width * 0.5 + i * (width * 0.16);
+          targetCtx.beginPath();
+          targetCtx.moveTo(gx, 0);
+          targetCtx.lineTo(gx, height);
+          targetCtx.stroke();
+        }
+
+        // 距離 L に応じた受光器の見かけ幅（1x基準）
+        const halfFovRad = ((state.fovDeg / 2) * Math.PI) / 180;
+        const sceneW_mm = 2 * (state.distanceM * 1000) * Math.tan(halfFovRad);
+        const rxW_1x = Math.max(2.2, (state.housingWidthMm / sceneW_mm) * width);
+        // 標準的なライトカーテン防護高さ（例: 900mm相当）
+        const rxH_1x = Math.max(48, (900 / sceneW_mm) * width);
+
+        // 微小な現場振動と初期ズレ（ユーザーがパン・オフセットで中心へ追い込める位置）
+        const vibX = Math.sin(timeMs * 0.0022) * (1.2 / Math.max(1, state.distanceM * 0.25));
+        const vibY = Math.cos(timeMs * 0.0017) * (0.9 / Math.max(1, state.distanceM * 0.25));
+        const initialMisalignX = 14;
+        const initialMisalignY = -8;
+
+        const cx = width * 0.5 + initialMisalignX + vibX;
+        const cy = height * 0.5 + initialMisalignY + vibY;
+
+        targetCtx.save();
+        targetCtx.translate(cx, cy);
+
+        // 上下取付ブラケット（シルバー金属）
+        targetCtx.fillStyle = '#94a3b8';
+        const brkW = rxW_1x * 1.45;
+        const brkH = Math.max(3, rxH_1x * 0.04);
+        targetCtx.fillRect(-brkW / 2, -rxH_1x / 2 - brkH, brkW, brkH);
+        targetCtx.fillRect(-brkW / 2, rxH_1x / 2, brkW, brkH);
+
+        // 受光器アルミ筐体（安全イエロー）
+        targetCtx.fillStyle = '#facc15';
+        targetCtx.fillRect(-rxW_1x / 2, -rxH_1x / 2, rxW_1x, rxH_1x);
+
+        // 中央の光学受光窓（ダークスモークライン）
+        const lensW = Math.max(1.0, rxW_1x * 0.42);
+        targetCtx.fillStyle = '#090d14';
+        targetCtx.fillRect(-lensW / 2, -rxH_1x * 0.45, lensW, rxH_1x * 0.9);
+
+        // センター基準白線（極細）
+        targetCtx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        targetCtx.fillRect(-0.35, -rxH_1x * 0.44, 0.7, rxH_1x * 0.88);
+
+        // 上端ステータス表示灯（LED）
+        targetCtx.fillStyle = '#00e676';
+        targetCtx.beginPath();
+        targetCtx.arc(0, -rxH_1x * 0.47, Math.max(1.2, rxW_1x * 0.22), 0, Math.PI * 2);
+        targetCtx.fill();
+
+        targetCtx.restore();
+      }
+
+      // ======================================================================
+      // 映像レイヤー描画（ズーム＋パン＋ミラー）
+      // ======================================================================
+      function renderSourceFrame(width, height, timeMs) {
+        if (sourceCanvas.width !== width || sourceCanvas.height !== height) {
+          sourceCanvas.width = width;
+          sourceCanvas.height = height;
+        }
+
+        sourceCtx.save();
+        sourceCtx.clearRect(0, 0, width, height);
+
+        // 中心基準でパン＆デジタルズーム＆ミラー適用
+        sourceCtx.translate(width / 2 + state.panX, height / 2 + state.panY);
+        sourceCtx.scale(state.isMirrored ? -state.zoom : state.zoom, state.zoom);
+        sourceCtx.translate(-width / 2, -height / 2);
+
+        if (state.cameraActive && els.cameraVideo.readyState >= 2) {
+          const vw = els.cameraVideo.videoWidth || width;
+          const vh = els.cameraVideo.videoHeight || height;
+          const coverScale = Math.max(width / vw, height / vh);
+          const drawW = vw * coverScale;
+          const drawH = vh * coverScale;
+          const dx = (width - drawW) / 2;
+          const dy = (height - drawH) / 2;
+          sourceCtx.drawImage(els.cameraVideo, dx, dy, drawW, drawH);
+        } else if (state.demoMode) {
+          drawDemoScene(sourceCtx, width, height, timeMs);
+        } else {
+          sourceCtx.fillStyle = '#06090e';
+          sourceCtx.fillRect(0, 0, width, height);
+        }
+
+        sourceCtx.restore();
+      }
+
+      // ======================================================================
+      // 照準レチクル・筐体幅W目安枠・傾斜水準器・10xルーペPIP描画
+      // ======================================================================
+      function drawHudAndLoupe(targetCtx, width, height, geom, isSnapshot) {
+        const rawCx = width / 2;
+        const rawCy = height / 2;
+
+        // 1. 補助グリッド
+        if (state.showGrid) {
+          targetCtx.strokeStyle = 'rgba(148, 163, 184, 0.16)';
+          targetCtx.lineWidth = 1;
+          const step = 48;
+          for (let x = rawCx % step; x < width; x += step) {
+            targetCtx.beginPath();
+            targetCtx.moveTo(x, 0);
+            targetCtx.lineTo(x, height);
+            targetCtx.stroke();
+          }
+          for (let y = rawCy % step; y < height; y += step) {
+            targetCtx.beginPath();
+            targetCtx.moveTo(0, y);
+            targetCtx.lineTo(width, y);
+            targetCtx.stroke();
+          }
+        }
+
+        // カメラ物理光軸中心の微細マーカー（白十字）
+        targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.42)';
+        targetCtx.lineWidth = 1;
+        targetCtx.beginPath();
+        targetCtx.moveTo(rawCx - 8, rawCy);
+        targetCtx.lineTo(rawCx + 8, rawCy);
+        targetCtx.moveTo(rawCx, rawCy - 8);
+        targetCtx.lineTo(rawCx, rawCy + 8);
+        targetCtx.stroke();
+
+        // 2. 物理オフセット補正後の「投光軸ターゲット中心」
+        const targetX = Math.max(24, Math.min(width - 24, rawCx + geom.shiftXPx));
+        const targetY = Math.max(24, Math.min(height - 54, rawCy + geom.shiftYPx));
+
+        // 物理中心 -> 投光軸中心のシフトベクトル線
+        if (Math.hypot(targetX - rawCx, targetY - rawCy) > 3) {
+          targetCtx.strokeStyle = '#ffab00';
+          targetCtx.lineWidth = 1.4;
+          targetCtx.setLineDash([4, 3]);
+          targetCtx.beginPath();
+          targetCtx.moveTo(rawCx, rawCy);
+          targetCtx.lineTo(targetX, targetY);
+          targetCtx.stroke();
+          targetCtx.setLineDash([]);
+        }
+
+        const rColor = state.reticleColor;
+
+        // 3. 既知の筐体幅 W 目安枠（左右の垂直ブラケットライン）
+        // 15m低倍率時でも視認できるよう最小表示半幅を確保しつつ実スケールを描画
+        const halfBracketW = Math.max(4, geom.apparentWidthPx / 2);
+        const bracketHalfH = Math.min(height * 0.36, Math.max(54, halfBracketW * 4.2));
+
+        // 筐体幅許容帯（半透明ハイライト）
+        targetCtx.fillStyle = hexToRgba(rColor, 0.1);
+        targetCtx.fillRect(targetX - halfBracketW, targetY - bracketHalfH, halfBracketW * 2, bracketHalfH * 2);
+
+        // 左右エッジ目安線（実線）
+        targetCtx.strokeStyle = rColor;
+        targetCtx.lineWidth = 2;
+        targetCtx.beginPath();
+        // 左エッジ縦線＋上下フック
+        targetCtx.moveTo(targetX - halfBracketW - 6, targetY - bracketHalfH);
+        targetCtx.lineTo(targetX - halfBracketW, targetY - bracketHalfH);
+        targetCtx.lineTo(targetX - halfBracketW, targetY + bracketHalfH);
+        targetCtx.lineTo(targetX - halfBracketW - 6, targetY + bracketHalfH);
+        // 右エッジ縦線＋上下フック
+        targetCtx.moveTo(targetX + halfBracketW + 6, targetY - bracketHalfH);
+        targetCtx.lineTo(targetX + halfBracketW, targetY - bracketHalfH);
+        targetCtx.lineTo(targetX + halfBracketW, targetY + bracketHalfH);
+        targetCtx.lineTo(targetX + halfBracketW + 6, targetY + bracketHalfH);
+        targetCtx.stroke();
+
+        // 筐体幅ラベル
+        targetCtx.fillStyle = rColor;
+        targetCtx.font = 'bold 10.5px ui-monospace, monospace';
+        targetCtx.textAlign = 'center';
+        targetCtx.fillText(
+          `W=${state.housingWidthMm}mm (${geom.apparentWidthPx.toFixed(1)}px)`,
+          targetX,
+          targetY - bracketHalfH - 7
+        );
+
+        // 4. センターライン＆精密クロスヘア
+        // 垂直センターライン（受光器の長手方向中心合わせ用）
+        targetCtx.strokeStyle = hexToRgba(rColor, 0.55);
+        targetCtx.lineWidth = 1.2;
+        targetCtx.setLineDash([6, 4]);
+        targetCtx.beginPath();
+        targetCtx.moveTo(targetX, 0);
+        targetCtx.lineTo(targetX, height);
+        targetCtx.moveTo(0, targetY);
+        targetCtx.lineTo(width, targetY);
+        targetCtx.stroke();
+        targetCtx.setLineDash([]);
+
+        // 中心精密クロスヘア（ギャップ付きで中心点の視認を妨げない設計）
+        targetCtx.strokeStyle = rColor;
+        targetCtx.lineWidth = 2.2;
+        targetCtx.beginPath();
+        targetCtx.moveTo(targetX - 24, targetY);
+        targetCtx.lineTo(targetX - 5, targetY);
+        targetCtx.moveTo(targetX + 5, targetY);
+        targetCtx.lineTo(targetX + 24, targetY);
+        targetCtx.moveTo(targetX, targetY - 24);
+        targetCtx.lineTo(targetX, targetY - 5);
+        targetCtx.moveTo(targetX, targetY + 5);
+        targetCtx.lineTo(targetX, targetY + 24);
+        targetCtx.stroke();
+
+        // 中心ドット
+        targetCtx.fillStyle = '#ff3d57';
+        targetCtx.beginPath();
+        targetCtx.arc(targetX, targetY, 2.2, 0, Math.PI * 2);
+        targetCtx.fill();
+
+        // 5. 右上：常時高倍率センター拡大ルーペ (PIP)
+        if (state.showLoupe) {
+          const pipSize = Math.min(134, Math.max(106, Math.floor(width * 0.28)));
+          const pipX = width - pipSize - 10;
+          const pipY = 10;
+          const loupeFactor = 3.2; // メイン映像からの追加拡大倍率（トータル高倍率観察用）
+
+          targetCtx.save();
+          // ルーペ枠クリッピング
+          targetCtx.beginPath();
+          targetCtx.roundRect(pipX, pipY, pipSize, pipSize, 10);
+          targetCtx.clip();
+
+          // 暗い背景
+          targetCtx.fillStyle = '#05070a';
+          targetCtx.fillRect(pipX, pipY, pipSize, pipSize);
+
+          // 照準中心周辺をsourceCanvasから切り出して拡大描画
+          const srcCropSize = pipSize / loupeFactor;
+          const sx = Math.max(0, Math.min(width - srcCropSize, targetX - srcCropSize / 2));
+          const sy = Math.max(0, Math.min(height - srcCropSize, targetY - srcCropSize / 2));
+
+          targetCtx.imageSmoothingEnabled = true;
+          targetCtx.drawImage(
+            sourceCanvas,
+            sx,
+            sy,
+            srcCropSize,
+            srcCropSize,
+            pipX,
+            pipY,
+            pipSize,
+            pipSize
+          );
+
+          // ルーペ内の拡大筐体幅目安線
+          const pipCx = pipX + pipSize / 2;
+          const pipCy = pipY + pipSize / 2;
+          const pipHalfW = (geom.apparentWidthPx * loupeFactor) / 2;
+
+          targetCtx.strokeStyle = rColor;
+          targetCtx.lineWidth = 1.6;
+          targetCtx.beginPath();
+          targetCtx.moveTo(pipCx - pipHalfW, pipY + 18);
+          targetCtx.lineTo(pipCx - pipHalfW, pipY + pipSize - 18);
+          targetCtx.moveTo(pipCx + pipHalfW, pipY + 18);
+          targetCtx.lineTo(pipCx + pipHalfW, pipY + pipSize - 18);
+          targetCtx.stroke();
+
+          // ルーペ内の精密クロスヘア
+          targetCtx.strokeStyle = hexToRgba(rColor, 0.85);
+          targetCtx.lineWidth = 1.5;
+          targetCtx.beginPath();
+          targetCtx.moveTo(pipX + 8, pipCy);
+          targetCtx.lineTo(pipCx - 4, pipCy);
+          targetCtx.moveTo(pipCx + 4, pipCy);
+          targetCtx.lineTo(pipX + pipSize - 8, pipCy);
+          targetCtx.moveTo(pipCx, pipY + 18);
+          targetCtx.lineTo(pipCx, pipCy - 4);
+          targetCtx.moveTo(pipCx, pipCy + 4);
+          targetCtx.lineTo(pipCx, pipY + pipSize - 18);
+          targetCtx.stroke();
+
+          targetCtx.fillStyle = '#ff3d57';
+          targetCtx.beginPath();
+          targetCtx.arc(pipCx, pipCy, 2.2, 0, Math.PI * 2);
+          targetCtx.fill();
+
+          // ルーペ上部ラベル帯
+          targetCtx.fillStyle = 'rgba(11, 15, 20, 0.84)';
+          targetCtx.fillRect(pipX, pipY, pipSize, 18);
+          targetCtx.fillStyle = '#f8fafc';
+          targetCtx.font = 'bold 9.5px ui-monospace, monospace';
+          targetCtx.textAlign = 'center';
+          const effectiveMag = (state.zoom * loupeFactor).toFixed(1);
+          targetCtx.fillText(`🔍 中心拡大 (${effectiveMag}x相当)`, pipCx, pipY + 12.5);
+
+          targetCtx.restore();
+
+          // ルーペ外枠ボーダー
+          targetCtx.strokeStyle = rColor;
+          targetCtx.lineWidth = 2;
+          targetCtx.beginPath();
+          targetCtx.roundRect(pipX, pipY, pipSize, pipSize, 10);
+          targetCtx.stroke();
+        }
+
+        // 6. 下部傾斜水準器バー
+        const roll = Number((state.rawRoll - state.zeroRoll).toFixed(1));
+        const pitch = Number((state.rawPitch - state.zeroPitch).toFixed(1));
+        const maxTilt = Math.max(Math.abs(roll), Math.abs(pitch));
+        const levelColor = maxTilt <= 0.5 ? '#00e676' : maxTilt <= 1.5 ? '#ffab00' : '#ff3d57';
+
+        const barW = Math.min(230, width * 0.6);
+        const barH = 14;
+        const barX = (width - barW) / 2;
+        const barY = height - 26;
+
+        targetCtx.fillStyle = 'rgba(11, 15, 20, 0.86)';
+        targetCtx.strokeStyle = levelColor;
+        targetCtx.lineWidth = 1.4;
+        targetCtx.beginPath();
+        targetCtx.roundRect(barX, barY, barW, barH, 7);
+        targetCtx.fill();
+        targetCtx.stroke();
+
+        // 中央基準線
+        targetCtx.strokeStyle = '#ffffff';
+        targetCtx.lineWidth = 1.4;
+        targetCtx.beginPath();
+        targetCtx.moveTo(width / 2, barY);
+        targetCtx.lineTo(width / 2, barY + barH);
+        targetCtx.stroke();
+
+        // 気泡ドット
+        const clampedRoll = Math.max(-10, Math.min(10, roll));
+        const bubbleX = width / 2 + (clampedRoll / 10) * (barW / 2 - 9);
+        targetCtx.fillStyle = levelColor;
+        targetCtx.beginPath();
+        targetCtx.arc(bubbleX, barY + barH / 2, 5.2, 0, Math.PI * 2);
+        targetCtx.fill();
+
+        targetCtx.fillStyle = '#f8fafc';
+        targetCtx.font = 'bold 10px ui-monospace, monospace';
+        targetCtx.textAlign = 'center';
+        targetCtx.fillText(
+          `ROLL ${roll >= 0 ? '+' : ''}${roll.toFixed(1)}° / PITCH ${pitch >= 0 ? '+' : ''}${pitch.toFixed(1)}°`,
+          width / 2,
+          barY - 5
+        );
+
+        // 7. スナップショット保存時のみメタデータフッタを刻印
+        if (isSnapshot) {
+          const nowStr = new Date().toLocaleString('ja-JP', { hour12: false });
+          targetCtx.fillStyle = 'rgba(11, 15, 20, 0.9)';
+          targetCtx.fillRect(0, 0, width - (state.showLoupe ? 148 : 0), 42);
+          targetCtx.fillStyle = '#00e5ff';
+          targetCtx.font = 'bold 10.5px ui-monospace, monospace';
+          targetCtx.textAlign = 'left';
+          targetCtx.fillText(`LC-ALIGN 15M | ${nowStr}`, 10, 16);
+          targetCtx.fillStyle = '#f8fafc';
+          targetCtx.fillText(
+            `L:${state.distanceM.toFixed(1)}m W:${state.housingWidthMm}mm ZOOM:${state.zoom.toFixed(1)}x Δ(${state.offsetXmm},${state.offsetYmm})mm θ:${geom.parallaxDeg.toFixed(3)}°`,
+            10,
+            32
+          );
+        }
+      }
+
+      function hexToRgba(hex, alpha) {
+        const clean = hex.replace('#', '');
+        const r = parseInt(clean.substring(0, 2), 16) || 0;
+        const g = parseInt(clean.substring(2, 4), 16) || 229;
+        const b = parseInt(clean.substring(4, 6), 16) || 255;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+
+      // ======================================================================
+      // メイン描画ループ＆UI同期
+      // ======================================================================
+      function syncUiValues(geom) {
+        const camName = state.demoMode
+          ? 'DEMO: 15m模擬受光器'
+          : state.facingMode === 'user'
+            ? 'CAM: インカメラ'
+            : 'CAM: 背面カメラ';
+        const mirName = state.isMirrored ? 'ミラー' : '正像';
+        els.hudStatusChip.textContent = `${camName} | ${mirName} | ${state.zoom.toFixed(1)}x`;
+        els.hudGeomChip.textContent = `L:${state.distanceM.toFixed(1)}m | W:${state.housingWidthMm}mm | θ:${geom.parallaxDeg.toFixed(3)}°`;
+
+        const roll = Number((state.rawRoll - state.zeroRoll).toFixed(1));
+        const pitch = Number((state.rawPitch - state.zeroPitch).toFixed(1));
+        const maxTilt = Math.max(Math.abs(roll), Math.abs(pitch));
+        els.hudLevelChip.className = `hud-chip ${maxTilt <= 0.5 ? 'ok' : maxTilt <= 1.5 ? 'warn' : 'err'}`;
+        els.hudLevelChip.textContent = `傾斜: R ${roll >= 0 ? '+' : ''}${roll.toFixed(1)}° / P ${pitch >= 0 ? '+' : ''}${pitch.toFixed(1)}°`;
+
+        // クイックドック
+        els.mirrorTitle.textContent = state.isMirrored ? 'ミラー反転' : '正像表示';
+        els.mirrorSub.textContent = state.isMirrored ? '鏡像表示中' : '左右そのまま';
+        els.facingTitle.textContent = state.facingMode === 'user' ? 'インカメラ' : '背面カメラ';
+
+        // スライダー・バッジ
+        els.zoomBadge.textContent = `${state.zoom.toFixed(1)}x`;
+        els.zoomSlider.value = state.zoom;
+
+        els.widthBadge.textContent = `W: ${state.housingWidthMm}mm`;
+        els.widthSlider.value = state.housingWidthMm;
+
+        els.distBadge.textContent = `L: ${state.distanceM.toFixed(1)}m`;
+        els.distSlider.value = state.distanceM;
+
+        els.fovBadge.textContent = `${state.fovDeg}°`;
+        els.fovSlider.value = state.fovDeg;
+
+        els.dxBadge.textContent = `${state.offsetXmm > 0 ? '+' : ''}${state.offsetXmm} mm`;
+        els.dyBadge.textContent = `${state.offsetYmm > 0 ? '+' : ''}${state.offsetYmm} mm`;
+
+        // 光学算出メトリクス
+        els.metricParallax.textContent = `${geom.parallaxDeg.toFixed(3)}°`;
+        els.metricScale.textContent = `${geom.mmPerPxZoomed.toFixed(2)} mm/px`;
+        els.metricApparentW.textContent = `${geom.apparentWidthPx.toFixed(1)} px`;
+
+        // プリセット選択ハイライト同期
+        document.querySelectorAll('#zoomPresetRow .preset-chip').forEach((b) => {
+          b.classList.toggle('selected', Math.abs(parseFloat(b.dataset.zoom) - state.zoom) < 0.05);
+        });
+        document.querySelectorAll('#widthPresetRow .preset-chip').forEach((b) => {
+          b.classList.toggle('selected', parseInt(b.dataset.w, 10) === state.housingWidthMm);
+        });
+        document.querySelectorAll('#distPresetRow .preset-chip').forEach((b) => {
+          b.classList.toggle('selected', Math.abs(parseFloat(b.dataset.l) - state.distanceM) < 0.05);
+        });
+        document.querySelectorAll('#reticleColorGroup .color-btn').forEach((b) => {
+          b.classList.toggle('selected', b.dataset.color === state.reticleColor);
+        });
+
+        // トグルボタン表記
+        els.toggleLoupeBtn.classList.toggle('active', state.showLoupe);
+        els.toggleLoupeBtn.innerHTML = `<span>🔍 10xルーペPIP: ${state.showLoupe ? 'ON' : 'OFF'}</span>`;
+        els.toggleGridBtn.classList.toggle('active', state.showGrid);
+        els.toggleGridBtn.innerHTML = `<span>▦ 補助グリッド: ${state.showGrid ? 'ON' : 'OFF'}</span>`;
+        els.demoModeBtn.classList.toggle('is-active', state.demoMode);
+      }
+
+      function animationLoop(timeMs) {
+        const rect = els.viewportStage.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = Math.max(260, Math.floor(rect.width));
+        const h = Math.max(260, Math.floor(rect.height));
+
+        if (els.mainCanvas.width !== Math.floor(w * dpr) || els.mainCanvas.height !== Math.floor(h * dpr)) {
+          els.mainCanvas.width = Math.floor(w * dpr);
+          els.mainCanvas.height = Math.floor(h * dpr);
+        }
+
+        const geom = computeOpticalGeometry(w);
+
+        // 1. オフスクリーンにズーム済み映像を描画
+        renderSourceFrame(w, h, timeMs);
+
+        // 2. メインキャンバスへ映像コピー＋HUD・ルーペ合成
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(sourceCanvas, 0, 0, w, h);
+        drawHudAndLoupe(ctx, w, h, geom, false);
+
+        syncUiValues(geom);
+        requestAnimationFrame(animationLoop);
+      }
+
+      // ======================================================================
+      // カメラ＆デモ映像制御
+      // ======================================================================
+      function stopCamera() {
+        if (state.stream) {
+          state.stream.getTracks().forEach((t) => t.stop());
+          state.stream = null;
+        }
+        state.cameraActive = false;
+        els.cameraVideo.style.display = 'none';
+      }
+
+      async function startCamera() {
+        stopCamera();
+        state.demoMode = false;
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          els.cameraBannerMsg.textContent =
+            'カメラAPIを利用できない環境です。「デモ映像モード」に切り替えて15m先の模擬受光器で操作をお試しください。';
+          els.cameraBanner.classList.remove('hidden');
+          return;
+        }
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              facingMode: { ideal: state.facingMode },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            }
+          });
+          state.stream = stream;
+          state.cameraActive = true;
+          els.cameraVideo.srcObject = stream;
+          await els.cameraVideo.play();
+          els.cameraBanner.classList.add('hidden');
+          showToast(state.facingMode === 'user' ? 'インカメラを起動しました' : '背面カメラを起動しました');
+        } catch (err) {
+          state.cameraActive = false;
+          els.cameraBannerMsg.textContent =
+            'カメラの起動が許可されていないか、カメラが検出されませんでした。権限を許可するか「デモ映像モード」をご利用ください。';
+          els.cameraBanner.classList.remove('hidden');
+        }
+      }
+
+      function startDemoMode() {
+        stopCamera();
+        state.demoMode = true;
+        els.cameraBanner.classList.add('hidden');
+        showToast('15m模擬受光器デモ映像モードに切り替えました');
+      }
+
+      // ======================================================================
+      // タッチ操作：ピンチズーム ＆ ドラッグパン
+      // ======================================================================
+      let isDragging = false;
+      let lastPointerX = 0;
+      let lastPointerY = 0;
+      let pinchStartDist = 0;
+      let pinchStartZoom = 1.0;
+
+      function clampPan() {
+        const rect = els.viewportStage.getBoundingClientRect();
+        const maxPanX = (rect.width * (state.zoom - 1)) / 2;
+        const maxPanY = (rect.height * (state.zoom - 1)) / 2;
+        state.panX = Math.max(-maxPanX, Math.min(maxPanX, state.panX));
+        state.panY = Math.max(-maxPanY, Math.min(maxPanY, state.panY));
+      }
+
+      function setZoom(newZoom) {
+        state.zoom = Math.max(1.0, Math.min(10.0, Math.round(newZoom * 10) / 10));
+        clampPan();
+      }
+
+      els.mainCanvas.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        state.panX += e.clientX - lastPointerX;
+        state.panY += e.clientY - lastPointerY;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+        clampPan();
+      });
+
+      window.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+
+      els.mainCanvas.addEventListener(
+        'touchstart',
+        (e) => {
+          if (e.touches.length === 1) {
+            isDragging = true;
+            lastPointerX = e.touches[0].clientX;
+            lastPointerY = e.touches[0].clientY;
+          } else if (e.touches.length === 2) {
+            isDragging = false;
+            pinchStartDist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            pinchStartZoom = state.zoom;
+          }
+        },
+        { passive: true }
+      );
+
+      els.mainCanvas.addEventListener(
+        'touchmove',
+        (e) => {
+          if (e.touches.length === 1 && isDragging) {
+            e.preventDefault();
+            state.panX += e.touches[0].clientX - lastPointerX;
+            state.panY += e.touches[0].clientY - lastPointerY;
+            lastPointerX = e.touches[0].clientX;
+            lastPointerY = e.touches[0].clientY;
+            clampPan();
+          } else if (e.touches.length === 2 && pinchStartDist > 0) {
+            e.preventDefault();
+            const curDist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            const scaleRatio = curDist / pinchStartDist;
+            setZoom(pinchStartZoom * scaleRatio);
+          }
+        },
+        { passive: false }
+      );
+
+      els.mainCanvas.addEventListener('touchend', () => {
+        isDragging = false;
+        pinchStartDist = 0;
+      });
+
+      // ======================================================================
+      // 傾斜センサー (DeviceOrientationEvent)
+      // ======================================================================
+      function handleOrientation(e) {
+        if (typeof e.gamma === 'number' && typeof e.beta === 'number') {
+          state.gyroEnabled = true;
+          state.rawRoll = Math.max(-45, Math.min(45, e.gamma));
+          state.rawPitch = Math.max(-45, Math.min(45, e.beta - 90));
+          els.gyroStateLabel.textContent = '傾斜: センサー稼働中';
+          els.gyroStateLabel.style.color = 'var(--accent-green)';
+          els.enableGyroBtn.classList.add('active');
+        }
+      }
+
+      els.enableGyroBtn.addEventListener('click', async () => {
+        try {
+          if (
+            typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function'
+          ) {
+            const perm = await DeviceOrientationEvent.requestPermission();
+            if (perm !== 'granted') {
+              showToast('傾斜センサーの許可が得られませんでした（HTTPS環境かご確認ください）');
+              return;
+            }
+          }
+          window.addEventListener('deviceorientation', handleOrientation);
+          els.gyroStateLabel.textContent = '傾斜: データ待機中...';
+          showToast('傾斜センサーを有効化しました');
+        } catch (err) {
+          showToast('この環境では傾斜センサーを利用できません');
+        }
+      });
+
+      els.zeroGyroBtn.addEventListener('click', () => {
+        state.zeroRoll = state.rawRoll;
+        state.zeroPitch = state.rawPitch;
+        showToast('現在の姿勢を傾斜 0.0° に補正しました');
+      });
+
+      // ======================================================================
+      // PNGスナップショット合成＆ダウンロード
+      // ======================================================================
+      els.snapshotBtn.addEventListener('click', () => {
+        const rect = els.viewportStage.getBoundingClientRect();
+        const w = Math.max(360, Math.floor(rect.width));
+        const h = Math.max(360, Math.floor(rect.height));
+        const scaleOut = 1.5;
+
+        const outCanvas = document.createElement('canvas');
+        outCanvas.width = Math.floor(w * scaleOut);
+        outCanvas.height = Math.floor(h * scaleOut);
+        const outCtx = outCanvas.getContext('2d');
+
+        const geom = computeOpticalGeometry(w);
+        renderSourceFrame(w, h, performance.now());
+
+        outCtx.scale(scaleOut, scaleOut);
+        outCtx.drawImage(sourceCanvas, 0, 0, w, h);
+        drawHudAndLoupe(outCtx, w, h, geom, true);
+
+        const dataUrl = outCanvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        link.download = `lc_align_15m_${stamp}.png`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast('照準・ルーペ・寸法入りのPNG画像を保存しました');
+      });
+
+      // ======================================================================
+      // コントロールイベント登録
+      // ======================================================================
+      els.startCamBtn.addEventListener('click', startCamera);
+      els.startDemoBtn.addEventListener('click', startDemoMode);
+
+      els.demoModeBtn.addEventListener('click', () => {
+        if (state.demoMode) {
+          startCamera();
+        } else {
+          startDemoMode();
+        }
+      });
+
+      els.expandHudBtn.addEventListener('click', () => {
+        const expanded = document.body.classList.toggle('hud-expanded');
+        els.expandHudBtn.classList.toggle('is-active', expanded);
+        els.expandHudLabel.textContent = expanded ? '↙ パネル表示' : '⛶ HUD拡大';
+      });
+
+      els.mirrorToggleBtn.addEventListener('click', () => {
+        state.isMirrored = !state.isMirrored;
+        saveSettings();
+        showToast(state.isMirrored ? 'ミラー反転表示に切り替えました' : '正像表示（左右そのまま）に切り替えました');
+      });
+
+      els.facingToggleBtn.addEventListener('click', () => {
+        state.facingMode = state.facingMode === 'user' ? 'environment' : 'user';
+        state.isMirrored = false;
+        saveSettings();
+        startCamera();
+      });
+
+      els.panResetBtn.addEventListener('click', () => {
+        state.panX = 0;
+        state.panY = 0;
+        showToast('パン（視点移動）を中央にリセットしました');
+      });
+
+      // ズーム操作
+      els.zoomSlider.addEventListener('input', (e) => setZoom(parseFloat(e.target.value)));
+      els.zoomDecBtn.addEventListener('click', () => setZoom(state.zoom - 0.1));
+      els.zoomIncBtn.addEventListener('click', () => setZoom(state.zoom + 0.1));
+
+      document.querySelectorAll('#zoomPresetRow .preset-chip').forEach((btn) => {
+        btn.addEventListener('click', () => setZoom(parseFloat(btn.dataset.zoom)));
+      });
+
+      // 筐体幅 W 操作
+      function setHousingWidth(w) {
+        state.housingWidthMm = Math.max(14, Math.min(60, Math.round(w)));
+        saveSettings();
+      }
+      els.widthSlider.addEventListener('input', (e) => setHousingWidth(parseInt(e.target.value, 10)));
+      els.wDecBtn.addEventListener('click', () => setHousingWidth(state.housingWidthMm - 1));
+      els.wIncBtn.addEventListener('click', () => setHousingWidth(state.housingWidthMm + 1));
+
+      document.querySelectorAll('#widthPresetRow .preset-chip').forEach((btn) => {
+        btn.addEventListener('click', () => setHousingWidth(parseInt(btn.dataset.w, 10)));
+      });
+
+      // 距離 L 操作
+      function setDistance(l) {
+        state.distanceM = Math.max(0.5, Math.min(15.0, Math.round(l * 2) / 2));
+        saveSettings();
+      }
+      els.distSlider.addEventListener('input', (e) => setDistance(parseFloat(e.target.value)));
+      els.lDecBtn.addEventListener('click', () => setDistance(state.distanceM - 0.5));
+      els.lIncBtn.addEventListener('click', () => setDistance(state.distanceM + 0.5));
+
+      document.querySelectorAll('#distPresetRow .preset-chip').forEach((btn) => {
+        btn.addEventListener('click', () => setDistance(parseFloat(btn.dataset.l)));
+      });
+
+      // 画角 FOV 操作
+      function setFov(fov) {
+        state.fovDeg = Math.max(50, Math.min(85, Math.round(fov)));
+        saveSettings();
+      }
+      els.fovSlider.addEventListener('input', (e) => setFov(parseInt(e.target.value, 10)));
+      els.fovDecBtn.addEventListener('click', () => setFov(state.fovDeg - 1));
+      els.fovIncBtn.addEventListener('click', () => setFov(state.fovDeg + 1));
+
+      // 物理オフセット (ΔX, ΔY mm) 操作
+      document.querySelectorAll('.step-btn[data-offset]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const axis = btn.dataset.offset;
+          const step = parseInt(btn.dataset.step, 10);
+          if (axis === 'dx') {
+            state.offsetXmm = Math.max(-100, Math.min(100, state.offsetXmm + step));
+          } else if (axis === 'dy') {
+            state.offsetYmm = Math.max(-100, Math.min(100, state.offsetYmm + step));
+          }
+          saveSettings();
+        });
+      });
+
+      els.resetOffsetBtn.addEventListener('click', () => {
+        state.offsetXmm = 0;
+        state.offsetYmm = 0;
+        saveSettings();
+        showToast('物理オフセット ΔX / ΔY を 0 mm にリセットしました');
+      });
+
+      // レチクル色・ルーペ・グリッド
+      document.querySelectorAll('#reticleColorGroup .color-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.reticleColor = btn.dataset.color;
+          saveSettings();
+        });
+      });
+
+      els.toggleLoupeBtn.addEventListener('click', () => {
+        state.showLoupe = !state.showLoupe;
+        saveSettings();
+      });
+
+      els.toggleGridBtn.addEventListener('click', () => {
+        state.showGrid = !state.showGrid;
+        saveSettings();
+      });
+
+      // トースト通知
+      let toastTimer = null;
+      function showToast(msg) {
+        els.toast.textContent = msg;
+        els.toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          els.toast.classList.remove('show');
+        }, 2200);
+      }
+
+      // 初期化
+      loadSettings();
+      startCamera();
+      requestAnimationFrame(animationLoop);
+    })();
+  </script>
+</body>
+</html>
