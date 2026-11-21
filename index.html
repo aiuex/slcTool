@@ -634,7 +634,7 @@
     <div class="header-inner">
       <div class="brand">
         <span class="brand-badge">LC ALIGN 15M</span>
-        <h1 class="brand-title">ライトカーテン光軸・目視アライメント支援</h1>
+        <h1 class="brand-title">SLC支援</h1>
       </div>
       <div class="header-actions">
         <button type="button" id="demoModeBtn" class="top-btn" title="カメラなしの15m模擬受光器映像切替">
@@ -923,6 +923,8 @@
         gyroEnabled: false,
         rawRoll: 0,
         rawPitch: 0,
+        smoothedRoll: 0,
+        smoothedPitch: 0,
         zeroRoll: 0,
         zeroPitch: 0
       };
@@ -1038,6 +1040,24 @@
       // 映像ソース専用オフスクリーンキャンバス（ルーペ切り出し用）
       const sourceCanvas = document.createElement('canvas');
       const sourceCtx = sourceCanvas.getContext('2d');
+
+      const TILT_SMOOTHING_TIME_MS = 350;
+      let previousAnimationTimeMs = null;
+
+      function updateTiltSmoothing(timeMs) {
+        const elapsedMs = previousAnimationTimeMs === null ? 0 : timeMs - previousAnimationTimeMs;
+        previousAnimationTimeMs = timeMs;
+        const amount = 1 - Math.exp(-Math.max(0, elapsedMs) / TILT_SMOOTHING_TIME_MS);
+        state.smoothedRoll += (state.rawRoll - state.smoothedRoll) * amount;
+        state.smoothedPitch += (state.rawPitch - state.smoothedPitch) * amount;
+      }
+
+      function getDisplayedTilt() {
+        return {
+          roll: Number((state.smoothedRoll - state.zeroRoll).toFixed(1)),
+          pitch: Number((state.smoothedPitch - state.zeroPitch).toFixed(1))
+        };
+      }
 
       // ======================================================================
       // 光学ジオメトリ＆スケール計算
@@ -1397,8 +1417,7 @@
         }
 
         // 6. 下部2D傾斜水準器（横軸: ロール / 縦軸: ピッチ）
-        const roll = Number((state.rawRoll - state.zeroRoll).toFixed(1));
-        const pitch = Number((state.rawPitch - state.zeroPitch).toFixed(1));
+        const { roll, pitch } = getDisplayedTilt();
         const maxTilt = Math.max(Math.abs(roll), Math.abs(pitch));
         const levelColor = maxTilt <= 0.5 ? '#00e676' : maxTilt <= 1.5 ? '#ffab00' : '#ff3d57';
 
@@ -1475,6 +1494,7 @@
       // メイン描画ループ＆UI同期
       // ======================================================================
       function syncUiValues(geom) {
+        const { roll, pitch } = getDisplayedTilt();
         const camName = state.demoMode
           ? 'DEMO: 15m模擬受光器'
           : state.facingMode === 'user'
@@ -1484,8 +1504,6 @@
         els.hudStatusChip.textContent = `${camName} | ${mirName} | ${state.zoom.toFixed(1)}x`;
         els.hudGeomChip.textContent = `L:${state.distanceM.toFixed(1)}m | W:${state.housingWidthMm}mm | θ:${geom.parallaxDeg.toFixed(3)}°`;
 
-        const roll = Number((state.rawRoll - state.zeroRoll).toFixed(1));
-        const pitch = Number((state.rawPitch - state.zeroPitch).toFixed(1));
         const maxTilt = Math.max(Math.abs(roll), Math.abs(pitch));
         els.hudLevelChip.className = `hud-chip ${maxTilt <= 0.5 ? 'ok' : maxTilt <= 1.5 ? 'warn' : 'err'}`;
         els.hudLevelChip.textContent = `傾斜: R ${roll >= 0 ? '+' : ''}${roll.toFixed(1)}° / P ${pitch >= 0 ? '+' : ''}${pitch.toFixed(1)}°`;
@@ -1539,6 +1557,7 @@
       }
 
       function animationLoop(timeMs) {
+        updateTiltSmoothing(timeMs);
         const rect = els.viewportStage.getBoundingClientRect();
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const w = Math.max(260, Math.floor(rect.width));
@@ -1742,6 +1761,8 @@
       els.zeroGyroBtn.addEventListener('click', () => {
         state.zeroRoll = state.rawRoll;
         state.zeroPitch = state.rawPitch;
+        state.smoothedRoll = state.rawRoll;
+        state.smoothedPitch = state.rawPitch;
         showToast('現在の姿勢を傾斜 0.0° に補正しました');
       });
 
