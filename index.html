@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <title>ライトカーテン光軸・目視アライメント支援ツール (15mズーム対応)</title>
+  <title>SLC支援ツール</title>
   <style>
     /* ==========================================================================
        産業FA・高コントラストダークテーマ
@@ -1396,39 +1396,44 @@
           targetCtx.stroke();
         }
 
-        // 6. 下部傾斜水準器バー
+        // 6. 下部2D傾斜水準器（横軸: ロール / 縦軸: ピッチ）
         const roll = Number((state.rawRoll - state.zeroRoll).toFixed(1));
         const pitch = Number((state.rawPitch - state.zeroPitch).toFixed(1));
         const maxTilt = Math.max(Math.abs(roll), Math.abs(pitch));
         const levelColor = maxTilt <= 0.5 ? '#00e676' : maxTilt <= 1.5 ? '#ffab00' : '#ff3d57';
 
-        const barW = Math.min(230, width * 0.6);
-        const barH = 14;
-        const barX = (width - barW) / 2;
-        const barY = height - 26;
+        const padSize = Math.min(82, width * 0.24);
+        const padRadius = padSize / 2;
+        const padX = width / 2;
+        const padY = height - padRadius - 16;
 
         targetCtx.fillStyle = 'rgba(11, 15, 20, 0.86)';
         targetCtx.strokeStyle = levelColor;
-        targetCtx.lineWidth = 1.4;
+        targetCtx.lineWidth = 1.5;
         targetCtx.beginPath();
-        targetCtx.roundRect(barX, barY, barW, barH, 7);
+        targetCtx.arc(padX, padY, padRadius, 0, Math.PI * 2);
         targetCtx.fill();
         targetCtx.stroke();
 
-        // 中央基準線
-        targetCtx.strokeStyle = '#ffffff';
-        targetCtx.lineWidth = 1.4;
+        // ロール・ピッチの基準軸
+        targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        targetCtx.lineWidth = 1;
         targetCtx.beginPath();
-        targetCtx.moveTo(width / 2, barY);
-        targetCtx.lineTo(width / 2, barY + barH);
+        targetCtx.moveTo(padX - padRadius + 9, padY);
+        targetCtx.lineTo(padX + padRadius - 9, padY);
+        targetCtx.moveTo(padX, padY - padRadius + 9);
+        targetCtx.lineTo(padX, padY + padRadius - 9);
         targetCtx.stroke();
 
-        // 気泡ドット
+        // 気泡ドット（±10°を表示範囲とし、ピッチ正方向は下向き）
+        const indicatorRange = padRadius - 12;
         const clampedRoll = Math.max(-10, Math.min(10, roll));
-        const bubbleX = width / 2 + (clampedRoll / 10) * (barW / 2 - 9);
+        const clampedPitch = Math.max(-10, Math.min(10, pitch));
+        const bubbleX = padX + (clampedRoll / 10) * indicatorRange;
+        const bubbleY = padY + (clampedPitch / 10) * indicatorRange;
         targetCtx.fillStyle = levelColor;
         targetCtx.beginPath();
-        targetCtx.arc(bubbleX, barY + barH / 2, 5.2, 0, Math.PI * 2);
+        targetCtx.arc(bubbleX, bubbleY, 5.2, 0, Math.PI * 2);
         targetCtx.fill();
 
         targetCtx.fillStyle = '#f8fafc';
@@ -1437,7 +1442,7 @@
         targetCtx.fillText(
           `ROLL ${roll >= 0 ? '+' : ''}${roll.toFixed(1)}° / PITCH ${pitch >= 0 ? '+' : ''}${pitch.toFixed(1)}°`,
           width / 2,
-          barY - 5
+          padY - padRadius - 6
         );
 
         // 7. スナップショット保存時のみメタデータフッタを刻印
