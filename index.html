@@ -1444,12 +1444,14 @@
         targetCtx.lineTo(padX, padY + padRadius - 9);
         targetCtx.stroke();
 
-        // 気泡ドット（±10°を表示範囲とし、ピッチ正方向は下向き）
+        // ロールのみ表示範囲を広げ、横方向の移動感度を下げる
         const indicatorRange = padRadius - 12;
-        const clampedRoll = Math.max(-10, Math.min(10, roll));
-        const clampedPitch = Math.max(-10, Math.min(10, pitch));
-        const bubbleX = padX + (clampedRoll / 10) * indicatorRange;
-        const bubbleY = padY + (clampedPitch / 10) * indicatorRange;
+        const rollRangeDeg = 15;
+        const pitchRangeDeg = 10;
+        const clampedRoll = Math.max(-rollRangeDeg, Math.min(rollRangeDeg, roll));
+        const clampedPitch = Math.max(-pitchRangeDeg, Math.min(pitchRangeDeg, pitch));
+        const bubbleX = padX + (clampedRoll / rollRangeDeg) * indicatorRange;
+        const bubbleY = padY + (clampedPitch / pitchRangeDeg) * indicatorRange;
         targetCtx.fillStyle = levelColor;
         targetCtx.beginPath();
         targetCtx.arc(bubbleX, bubbleY, 5.2, 0, Math.PI * 2);
