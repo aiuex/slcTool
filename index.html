@@ -1369,8 +1369,9 @@
 
         // 1. 補助グリッド
         if (state.showGrid) {
-          targetCtx.strokeStyle = state.reticleColor;
-          targetCtx.lineWidth = 2;
+          targetCtx.strokeStyle = hexToRgba(state.reticleColor, 0.3);
+          targetCtx.lineWidth = 1;
+          targetCtx.setLineDash([2, 6]);
           const step = 48;
           for (let x = rawCx % step; x < width; x += step) {
             targetCtx.beginPath();
@@ -1384,6 +1385,7 @@
             targetCtx.lineTo(width, y);
             targetCtx.stroke();
           }
+          targetCtx.setLineDash([]);
         }
 
         // カメラ物理光軸中心の微細マーカー（白十字）
