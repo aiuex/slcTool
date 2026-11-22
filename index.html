@@ -1564,11 +1564,10 @@
         targetCtx.lineTo(padX, padY + padRadius - 9);
         targetCtx.stroke();
 
-        // ロールのみ表示範囲を広げ、横方向の移動感度を下げる
+        // iOSでは両軸の表示範囲を広げ、点の移動と端への張り付きを抑える
         const indicatorRange = padRadius - 12;
-        // iOSではインジケーターのみ25%鈍くし、表示角度の数値は変えない。
-        const rollRangeDeg = isIosDevice ? 20 : 15;
-        const pitchRangeDeg = 10;
+        const rollRangeDeg = isIosDevice ? 30 : 15;
+        const pitchRangeDeg = isIosDevice ? 15 : 10;
         const clampedRoll = Math.max(-rollRangeDeg, Math.min(rollRangeDeg, roll));
         const clampedPitch = Math.max(-pitchRangeDeg, Math.min(pitchRangeDeg, pitch));
         const bubbleX = padX + (clampedRoll / rollRangeDeg) * indicatorRange;
