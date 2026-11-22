@@ -606,6 +606,30 @@
       gap: 8px;
     }
 
+    .gyro-permission-prompt {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--accent-amber);
+      border-radius: var(--radius-md);
+      background: rgba(11, 15, 20, 0.96);
+    }
+
+    .gyro-permission-prompt[hidden] {
+      display: none;
+    }
+
+    .gyro-permission-prompt p {
+      flex: 1 1 180px;
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 11.5px;
+      line-height: 1.4;
+    }
+
     .full-btn {
       min-height: 46px;
       padding: 8px 10px;
@@ -625,6 +649,11 @@
 
     .full-btn:active {
       transform: scale(0.98);
+    }
+
+    .full-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .full-btn.active {
@@ -802,6 +831,11 @@
 
     <!-- 設定カテゴリ選択と操作パネル -->
     <div class="controls-column">
+      <div class="gyro-permission-prompt" id="gyroPermissionPrompt" role="status" aria-live="polite" hidden>
+        <p id="gyroPermissionMessage">傾斜センサーを使うには、端末の許可が必要です。</p>
+        <button type="button" class="top-btn" id="gyroPermissionBtn">🧭 傾斜センサーを許可</button>
+      </div>
+
       <div class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
         <button type="button" class="settings-tab" id="settingsTabZoom" role="tab" aria-controls="settingsPanelZoom" aria-selected="true" tabindex="0">
           ① ズーム
@@ -980,8 +1014,8 @@
         </div>
 
         <div class="action-grid-2">
-          <button type="button" id="enableGyroBtn" class="full-btn">
-            <span>🧭 傾斜センサー有効化</span>
+          <button type="button" id="cancelGyroZeroBtn" class="full-btn" disabled>
+            <span>↩ ゼロ点補正を取り消す</span>
           </button>
           <button type="button" id="zeroGyroBtn" class="full-btn">
             <span>🎯 傾斜ゼロ点補正</span>
@@ -1035,12 +1069,15 @@
 
         // 傾斜センサー状態
         gyroEnabled: false,
+        gyroDataReceived: false,
         rawRoll: 0,
         rawPitch: 0,
         smoothedRoll: 0,
         smoothedPitch: 0,
         zeroRoll: 0,
-        zeroPitch: 0
+        zeroPitch: 0,
+        previousZeroRoll: null,
+        previousZeroPitch: null
       };
 
       // 永続化設定の復元
@@ -1141,9 +1178,12 @@
         resetOffsetBtn: document.getElementById('resetOffsetBtn'),
 
         gyroStateLabel: document.getElementById('gyroStateLabel'),
+        gyroPermissionPrompt: document.getElementById('gyroPermissionPrompt'),
+        gyroPermissionMessage: document.getElementById('gyroPermissionMessage'),
+        gyroPermissionBtn: document.getElementById('gyroPermissionBtn'),
         toggleLoupeBtn: document.getElementById('toggleLoupeBtn'),
         toggleGridBtn: document.getElementById('toggleGridBtn'),
-        enableGyroBtn: document.getElementById('enableGyroBtn'),
+        cancelGyroZeroBtn: document.getElementById('cancelGyroZeroBtn'),
         zeroGyroBtn: document.getElementById('zeroGyroBtn'),
 
         toast: document.getElementById('toast')
@@ -1849,40 +1889,85 @@
         const pitch = e.beta - 90;
         const roll = pitch > 0 ? -e.gamma : e.gamma;
         state.gyroEnabled = true;
+        state.gyroDataReceived = true;
         state.rawRoll = Math.max(-45, Math.min(45, roll));
         state.rawPitch = Math.max(-45, Math.min(45, pitch));
         els.gyroStateLabel.textContent = '傾斜: センサー稼働中';
         els.gyroStateLabel.style.color = 'var(--accent-green)';
-        els.enableGyroBtn.classList.add('active');
+        els.gyroPermissionPrompt.hidden = true;
       }
 
-      els.enableGyroBtn.addEventListener('click', async () => {
+      function showGyroPermissionCancelled() {
+        els.gyroStateLabel.textContent = '傾斜: 許可が必要です';
+        els.gyroStateLabel.style.color = 'var(--accent-amber)';
+        els.gyroPermissionMessage.textContent =
+          '許可がキャンセルされました。再度有効にするにはページを再読み込みしてください。';
+        els.gyroPermissionBtn.hidden = true;
+        els.gyroPermissionPrompt.hidden = false;
+        showToast('再度センサーを有効にするにはページを再読み込みしてください');
+      }
+
+      function startGyroListener() {
+        if (state.gyroEnabled) return;
+        window.addEventListener('deviceorientation', handleOrientation);
+        state.gyroEnabled = true;
+        els.gyroStateLabel.textContent = '傾斜: データ待機中...';
+        els.gyroStateLabel.style.color = 'var(--text-muted)';
+      }
+
+      async function requestGyroPermission() {
+        els.gyroPermissionBtn.disabled = true;
         try {
-          if (typeof DeviceOrientationEvent === 'undefined') {
-            showToast('この環境では傾斜センサーを利用できません');
+          const permission = await DeviceOrientationEvent.requestPermission();
+          if (permission !== 'granted') {
+            showGyroPermissionCancelled();
             return;
           }
-          if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            const permission = await DeviceOrientationEvent.requestPermission();
-            if (permission !== 'granted') {
-              showToast('傾斜センサーの許可が得られませんでした（HTTPS環境かご確認ください）');
-              return;
-            }
-          }
-          window.addEventListener('deviceorientation', handleOrientation);
-          els.gyroStateLabel.textContent = '傾斜: データ待機中...';
-          showToast('傾斜センサーを有効化しました');
+          startGyroListener();
+          els.gyroPermissionPrompt.hidden = true;
         } catch (err) {
-          showToast('この環境では傾斜センサーを利用できません');
+          showGyroPermissionCancelled();
         }
-      });
+      }
+
+      function initializeGyro() {
+        if (typeof DeviceOrientationEvent === 'undefined') {
+          els.gyroStateLabel.textContent = '傾斜: 非対応';
+          els.gyroStateLabel.style.color = 'var(--accent-amber)';
+          return;
+        }
+
+        if (typeof DeviceOrientationEvent.requestPermission !== 'function') {
+          startGyroListener();
+          return;
+        }
+
+        els.gyroStateLabel.textContent = '傾斜: 許可が必要です';
+        els.gyroPermissionBtn.addEventListener('click', requestGyroPermission);
+        window.setTimeout(() => {
+          if (!state.gyroDataReceived) els.gyroPermissionPrompt.hidden = false;
+        }, 800);
+      }
 
       els.zeroGyroBtn.addEventListener('click', () => {
+        state.previousZeroRoll = state.zeroRoll;
+        state.previousZeroPitch = state.zeroPitch;
         state.zeroRoll = state.rawRoll;
         state.zeroPitch = state.rawPitch;
         state.smoothedRoll = state.rawRoll;
         state.smoothedPitch = state.rawPitch;
+        els.cancelGyroZeroBtn.disabled = false;
         showToast('現在の姿勢を傾斜 0.0° に補正しました');
+      });
+
+      els.cancelGyroZeroBtn.addEventListener('click', () => {
+        if (state.previousZeroRoll === null || state.previousZeroPitch === null) return;
+        state.zeroRoll = state.previousZeroRoll;
+        state.zeroPitch = state.previousZeroPitch;
+        state.previousZeroRoll = null;
+        state.previousZeroPitch = null;
+        els.cancelGyroZeroBtn.disabled = true;
+        showToast('直前のゼロ点補正を取り消しました');
       });
 
       // ======================================================================
@@ -2086,6 +2171,7 @@
 
       // 初期化
       loadSettings();
+      initializeGyro();
       startCamera();
       requestAnimationFrame(animationLoop);
     })();
