@@ -1155,10 +1155,6 @@
       const sourceCanvas = document.createElement('canvas');
       const sourceCtx = sourceCanvas.getContext('2d');
 
-      const isIosDevice =
-        /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
       const TILT_SMOOTHING_TIME_MS = 350;
       let previousAnimationTimeMs = null;
 
@@ -1564,14 +1560,13 @@
         targetCtx.lineTo(padX, padY + padRadius - 9);
         targetCtx.stroke();
 
-        // iOSでは両軸の表示範囲を広げ、点の移動と端への張り付きを抑える
+        // 両OS・両軸で表示範囲を共通化し、倍率差をなくす
         const indicatorRange = padRadius - 12;
-        const rollRangeDeg = isIosDevice ? 30 : 15;
-        const pitchRangeDeg = isIosDevice ? 15 : 10;
-        const clampedRoll = Math.max(-rollRangeDeg, Math.min(rollRangeDeg, roll));
-        const clampedPitch = Math.max(-pitchRangeDeg, Math.min(pitchRangeDeg, pitch));
-        const bubbleX = padX + (clampedRoll / rollRangeDeg) * indicatorRange;
-        const bubbleY = padY + (clampedPitch / pitchRangeDeg) * indicatorRange;
+        const axisRangeDeg = 30;
+        const clampedRoll = Math.max(-axisRangeDeg, Math.min(axisRangeDeg, roll));
+        const clampedPitch = Math.max(-axisRangeDeg, Math.min(axisRangeDeg, pitch));
+        const bubbleX = padX + (clampedRoll / axisRangeDeg) * indicatorRange;
+        const bubbleY = padY + (clampedPitch / axisRangeDeg) * indicatorRange;
         targetCtx.fillStyle = levelColor;
         targetCtx.beginPath();
         targetCtx.arc(bubbleX, bubbleY, 5.2, 0, Math.PI * 2);
