@@ -1155,6 +1155,10 @@
       const sourceCanvas = document.createElement('canvas');
       const sourceCtx = sourceCanvas.getContext('2d');
 
+      const isIosDevice =
+        /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
       const TILT_SMOOTHING_TIME_MS = 350;
       let previousAnimationTimeMs = null;
 
@@ -1562,7 +1566,8 @@
 
         // ロールのみ表示範囲を広げ、横方向の移動感度を下げる
         const indicatorRange = padRadius - 12;
-        const rollRangeDeg = 15;
+        // iOSではインジケーターのみ25%鈍くし、表示角度の数値は変えない。
+        const rollRangeDeg = isIosDevice ? 20 : 15;
         const pitchRangeDeg = 10;
         const clampedRoll = Math.max(-rollRangeDeg, Math.min(rollRangeDeg, roll));
         const clampedPitch = Math.max(-pitchRangeDeg, Math.min(pitchRangeDeg, pitch));
