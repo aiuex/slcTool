@@ -512,6 +512,10 @@
       grid-template-columns: repeat(4, 1fr);
     }
 
+    .chip-row.cols-2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
     .preset-chip {
       min-height: 42px;
       padding: 4px 4px;
@@ -762,7 +766,6 @@
   <header class="app-header">
     <div class="header-inner">
       <div class="brand">
-        <span class="brand-badge">LC ALIGN 15M</span>
         <h1 class="brand-title">SLC支援</h1>
       </div>
       <div class="header-actions">
@@ -878,23 +881,16 @@
       <section class="panel" id="settingsPanelGeometry" role="tabpanel" aria-labelledby="settingsTabGeometry" tabindex="0" aria-label="既知の筐体幅と距離設定" hidden>
         <div class="panel-head">
           <h2 class="panel-title">2. 既知の筐体幅 (W) ＆ 投受光間距離 (L)</h2>
-          <span id="widthBadge" class="val-badge">W: 30mm</span>
+          <span id="widthBadge" class="val-badge">W: 32mm</span>
         </div>
 
         <!-- 筐体幅 W (mm) -->
         <div style="font-size:12px; font-weight:700; margin-bottom:6px; color:var(--text-secondary);">
           受光器 筐体幅 W (mm)
         </div>
-        <div class="control-row">
-          <button type="button" id="wDecBtn" class="step-btn">-1</button>
-          <input type="range" id="widthSlider" min="14" max="60" step="1" value="30" />
-          <button type="button" id="wIncBtn" class="step-btn">+1</button>
-        </div>
-        <div class="chip-row cols-4" id="widthPresetRow" style="margin-bottom:12px;">
-          <button type="button" class="preset-chip" data-w="24">24mm</button>
-          <button type="button" class="preset-chip" data-w="28">28mm</button>
-          <button type="button" class="preset-chip selected" data-w="30">30mm</button>
-          <button type="button" class="preset-chip" data-w="35">35mm</button>
+        <div class="chip-row cols-2" id="widthPresetRow" style="margin-bottom:12px;">
+          <button type="button" class="preset-chip selected" data-w="32">32(SR/PG)</button>
+          <button type="button" class="preset-chip" data-w="30">30(SJ)</button>
         </div>
 
         <!-- 投受光間距離 L (m) -->
@@ -1053,7 +1049,7 @@
         panY: 0,                  // ビューポートパンY (CSS px)
 
         // 既知の物理寸法・光学パラメータ
-        housingWidthMm: 30,       // 受光器筐体幅 W (mm)
+        housingWidthMm: 32,       // 受光器筐体幅 W (mm)
         distanceM: 15.0,          // 投受光間距離 L (0.5m 〜 15.0m)
         fovDeg: 65,               // カメラ水平画角 FOV (°)
         offsetXmm: 0,             // カメラ〜投光中心 水平物理ズレ ΔX (mm)
@@ -1082,13 +1078,19 @@
         previousZeroPitch: null
       };
 
+      function normalizeHousingWidth(w) {
+        return w < 31 ? 30 : 32;
+      }
+
       // 永続化設定の復元
       function loadSettings() {
         try {
           const raw = localStorage.getItem(STORAGE_KEY);
           if (!raw) return;
           const s = JSON.parse(raw);
-          if (typeof s.housingWidthMm === 'number') state.housingWidthMm = s.housingWidthMm;
+          if (typeof s.housingWidthMm === 'number') {
+            state.housingWidthMm = normalizeHousingWidth(s.housingWidthMm);
+          }
           if (typeof s.distanceM === 'number') state.distanceM = s.distanceM;
           if (typeof s.fovDeg === 'number') state.fovDeg = s.fovDeg;
           if (typeof s.offsetXmm === 'number') state.offsetXmm = s.offsetXmm;
@@ -1155,9 +1157,6 @@
         zoomIncBtn: document.getElementById('zoomIncBtn'),
 
         widthBadge: document.getElementById('widthBadge'),
-        widthSlider: document.getElementById('widthSlider'),
-        wDecBtn: document.getElementById('wDecBtn'),
-        wIncBtn: document.getElementById('wIncBtn'),
 
         distBadge: document.getElementById('distBadge'),
         distSlider: document.getElementById('distSlider'),
@@ -1674,7 +1673,6 @@
         els.zoomSlider.value = state.zoom;
 
         els.widthBadge.textContent = `W: ${state.housingWidthMm}mm`;
-        els.widthSlider.value = state.housingWidthMm;
 
         els.distBadge.textContent = `L: ${state.distanceM.toFixed(1)}m`;
         els.distSlider.value = state.distanceM;
@@ -2081,12 +2079,9 @@
 
       // 筐体幅 W 操作
       function setHousingWidth(w) {
-        state.housingWidthMm = Math.max(14, Math.min(60, Math.round(w)));
+        state.housingWidthMm = normalizeHousingWidth(w);
         saveSettings();
       }
-      els.widthSlider.addEventListener('input', (e) => setHousingWidth(parseInt(e.target.value, 10)));
-      els.wDecBtn.addEventListener('click', () => setHousingWidth(state.housingWidthMm - 1));
-      els.wIncBtn.addEventListener('click', () => setHousingWidth(state.housingWidthMm + 1));
 
       document.querySelectorAll('#widthPresetRow .preset-chip').forEach((btn) => {
         btn.addEventListener('click', () => setHousingWidth(parseInt(btn.dataset.w, 10)));
