@@ -1861,21 +1861,15 @@
         }
       }
 
-      async function enableGyro() {
-        if (state.gyroEnabled || typeof DeviceOrientationEvent === 'undefined') return;
-
+      async function requestGyroPermission() {
         try {
-          if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            const perm = await DeviceOrientationEvent.requestPermission();
-            if (perm !== 'granted') {
-              els.gyroStateLabel.textContent = '傾斜: 許可されていません';
-              els.gyroStateLabel.style.color = 'var(--accent-amber)';
-              showToast('傾斜センサーの許可が得られませんでした');
-              return;
-            }
+          const perm = await DeviceOrientationEvent.requestPermission();
+          if (perm !== 'granted') {
+            els.gyroStateLabel.textContent = '傾斜: 許可されていません';
+            els.gyroStateLabel.style.color = 'var(--accent-amber)';
+            showToast('傾斜センサーの許可が得られませんでした');
+            return;
           }
-          window.addEventListener('deviceorientation', handleOrientation);
-          state.gyroEnabled = true;
           els.gyroStateLabel.textContent = '傾斜: データ待機中...';
           els.gyroStateLabel.style.color = 'var(--text-muted)';
         } catch (err) {
@@ -1892,10 +1886,11 @@
           return;
         }
 
-        if (typeof DeviceOrientationEvent.requestPermission !== 'function') {
-          enableGyro();
-          return;
-        }
+        window.addEventListener('deviceorientation', handleOrientation);
+        state.gyroEnabled = true;
+        els.gyroStateLabel.textContent = '傾斜: データ待機中...';
+        els.gyroStateLabel.style.color = 'var(--text-muted)';
+        if (typeof DeviceOrientationEvent.requestPermission !== 'function') return;
 
         els.gyroStateLabel.textContent = '傾斜: 初回操作で許可を確認';
         let permissionRequested = false;
@@ -1904,7 +1899,7 @@
           permissionRequested = true;
           document.removeEventListener('pointerdown', requestPermissionFromGesture);
           document.removeEventListener('keydown', requestPermissionFromGesture);
-          enableGyro();
+          requestGyroPermission();
         };
         document.addEventListener('pointerdown', requestPermissionFromGesture, { once: true });
         document.addEventListener('keydown', requestPermissionFromGesture, { once: true });
