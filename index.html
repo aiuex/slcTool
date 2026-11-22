@@ -1845,15 +1845,30 @@
       // ======================================================================
       // 傾斜センサー (DeviceOrientationEvent)
       // ======================================================================
+      function getTiltAngles(beta, gamma) {
+        // beta/gammaから重力方向を求め、重力軸まわりのgamma変化をROLLに混ぜない。
+        const betaRad = (beta * Math.PI) / 180;
+        const gammaRad = (gamma * Math.PI) / 180;
+        const gravityX = Math.cos(betaRad) * Math.sin(gammaRad);
+        const gravityY = -Math.sin(betaRad);
+        const gravityZ = -Math.cos(betaRad) * Math.cos(gammaRad);
+
+        return {
+          roll: (Math.atan2(gravityX, -gravityY) * 180) / Math.PI,
+          pitch: (Math.atan2(gravityZ, -gravityY) * 180) / Math.PI
+        };
+      }
+
       function handleOrientation(e) {
-        if (typeof e.gamma === 'number' && typeof e.beta === 'number') {
-          state.gyroEnabled = true;
-          state.rawRoll = Math.max(-45, Math.min(45, e.gamma));
-          state.rawPitch = Math.max(-45, Math.min(45, e.beta - 90));
-          els.gyroStateLabel.textContent = '傾斜: センサー稼働中';
-          els.gyroStateLabel.style.color = 'var(--accent-green)';
-          els.enableGyroBtn.classList.add('active');
-        }
+        if (!Number.isFinite(e.beta) || !Number.isFinite(e.gamma)) return;
+
+        const tilt = getTiltAngles(e.beta, e.gamma);
+        state.gyroEnabled = true;
+        state.rawRoll = Math.max(-45, Math.min(45, tilt.roll));
+        state.rawPitch = Math.max(-45, Math.min(45, tilt.pitch));
+        els.gyroStateLabel.textContent = '傾斜: センサー稼働中';
+        els.gyroStateLabel.style.color = 'var(--accent-green)';
+        els.enableGyroBtn.classList.add('active');
       }
 
       els.enableGyroBtn.addEventListener('click', async () => {
