@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <title>SLC支援ツール</title>
+  <title>SLC設置支援ツール</title>
   <style>
     /* ==========================================================================
        産業FA・高コントラストダークテーマ
@@ -766,7 +766,7 @@
   <header class="app-header">
     <div class="header-inner">
       <div class="brand">
-        <h1 class="brand-title">SLC支援</h1>
+        <h1 class="brand-title">SLC設置支援</h1>
       </div>
       <div class="header-actions">
         <button type="button" id="demoModeBtn" class="top-btn" title="カメラなしの15m模擬受光器映像切替">
@@ -980,7 +980,7 @@
       <!-- 4. レチクル色・ルーペPIP・傾斜水準器 -->
       <section class="panel" id="settingsPanelDisplay" role="tabpanel" aria-labelledby="settingsTabDisplay" tabindex="0" aria-label="照準色と傾斜水準器設定" hidden>
         <div class="panel-head">
-          <h2 class="panel-title">4. 高視認レチクル色 ＆ 傾斜水準器</h2>
+          <h2 class="panel-title">4. 照準マーク色 ＆ 傾斜水準補正</h2>
           <span id="gyroStateLabel" style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">
             傾斜: 待機中
           </span>
@@ -1369,8 +1369,8 @@
 
         // 1. 補助グリッド
         if (state.showGrid) {
-          targetCtx.strokeStyle = 'rgba(148, 163, 184, 0.16)';
-          targetCtx.lineWidth = 1;
+          targetCtx.strokeStyle = state.reticleColor;
+          targetCtx.lineWidth = 2;
           const step = 48;
           for (let x = rawCx % step; x < width; x += step) {
             targetCtx.beginPath();
@@ -1704,7 +1704,7 @@
 
         // トグルボタン表記
         els.toggleLoupeBtn.classList.toggle('active', state.showLoupe);
-        els.toggleLoupeBtn.innerHTML = `<span>🔍 10xルーペPIP: ${state.showLoupe ? 'ON' : 'OFF'}</span>`;
+        els.toggleLoupeBtn.innerHTML = `<span>🔍 10xワイプ: ${state.showLoupe ? 'ON' : 'OFF'}</span>`;
         els.toggleGridBtn.classList.toggle('active', state.showGrid);
         els.toggleGridBtn.innerHTML = `<span>▦ 補助グリッド: ${state.showGrid ? 'ON' : 'OFF'}</span>`;
         els.demoModeBtn.classList.toggle('is-active', state.demoMode);
