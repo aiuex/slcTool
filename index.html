@@ -761,7 +761,7 @@
 
         <!-- 左上リアルタイムステータス -->
         <div class="hud-top-left">
-          <span class="hud-chip" id="hudStatusChip">CAM: インカメラ | 正像 | 5.0x</span>
+          <span class="hud-chip" id="hudStatusChip">CAM: インカメラ | ミラー | 5.0x</span>
           <span class="hud-chip" id="hudGeomChip">L: 15.0m | W: 30mm | パララックス: 0.095°</span>
           <span class="hud-chip ok" id="hudLevelChip">傾斜: R 0.0° / P 0.0°</span>
         </div>
@@ -785,8 +785,8 @@
       <!-- クイック操作ドック -->
       <div class="quick-dock" role="toolbar" aria-label="クイック操作">
         <button type="button" id="mirrorToggleBtn" class="dock-btn accent-cyan">
-          <span id="mirrorTitle">正像表示</span>
-          <span id="mirrorSub" class="dock-sub">左右そのまま</span>
+          <span id="mirrorTitle">ミラー反転</span>
+          <span id="mirrorSub" class="dock-sub">鏡像表示中</span>
         </button>
 
         <button type="button" id="facingToggleBtn" class="dock-btn">
@@ -1017,7 +1017,7 @@
       // ======================================================================
       const state = {
         facingMode: 'user',       // 'user' (インカメラ) | 'environment' (背面カメラ)
-        isMirrored: false,        // デフォルトは受光器側から見て直感的な正像
+        isMirrored: true,         // デフォルトは鏡像表示
         zoom: 5.0,                // デジタルズーム倍率 (1.0 〜 10.0)
         panX: 0,                  // ビューポートパンX (CSS px)
         panY: 0,                  // ビューポートパンY (CSS px)
