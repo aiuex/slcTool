@@ -352,6 +352,30 @@
       gap: 6px;
     }
 
+    .gyro-permission-prompt {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--accent-amber);
+      border-radius: var(--radius-md);
+      background: rgba(11, 15, 20, 0.96);
+    }
+
+    .gyro-permission-prompt[hidden] {
+      display: none;
+    }
+
+    .gyro-permission-prompt p {
+      flex: 1 1 180px;
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 11.5px;
+      line-height: 1.4;
+    }
+
     .settings-tab {
       min-width: 0;
       min-height: 46px;
@@ -808,6 +832,11 @@
 
     <!-- 設定カテゴリ選択と操作パネル -->
     <div class="controls-column">
+      <div class="gyro-permission-prompt" id="gyroPermissionPrompt" role="status" aria-live="polite" hidden>
+        <p id="gyroPermissionMessage">傾斜センサーを使うには、端末の許可が必要です。</p>
+        <button type="button" class="top-btn" id="gyroPermissionBtn">🧭 傾斜センサーを許可</button>
+      </div>
+
       <div class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
         <button type="button" class="settings-tab" id="settingsTabZoom" role="tab" aria-controls="settingsPanelZoom" aria-selected="true" tabindex="0">
           ① ズーム
@@ -1042,6 +1071,7 @@
 
         // 傾斜センサー状態
         gyroEnabled: false,
+        gyroDataReceived: false,
         rawRoll: 0,
         rawPitch: 0,
         smoothedRoll: 0,
@@ -1148,6 +1178,9 @@
         resetOffsetBtn: document.getElementById('resetOffsetBtn'),
 
         gyroStateLabel: document.getElementById('gyroStateLabel'),
+        gyroPermissionPrompt: document.getElementById('gyroPermissionPrompt'),
+        gyroPermissionMessage: document.getElementById('gyroPermissionMessage'),
+        gyroPermissionBtn: document.getElementById('gyroPermissionBtn'),
         toggleLoupeBtn: document.getElementById('toggleLoupeBtn'),
         toggleGridBtn: document.getElementById('toggleGridBtn'),
         cancelGyroZeroBtn: document.getElementById('cancelGyroZeroBtn'),
@@ -1853,30 +1886,40 @@
       function handleOrientation(e) {
         if (typeof e.gamma === 'number' && typeof e.beta === 'number') {
           state.gyroEnabled = true;
+          state.gyroDataReceived = true;
           state.rawRoll = Math.max(-45, Math.min(45, e.gamma));
           state.rawPitch = Math.max(-45, Math.min(45, e.beta - 90));
           els.gyroStateLabel.textContent = '傾斜: センサー稼働中';
           els.gyroStateLabel.style.color = 'var(--accent-green)';
+          els.gyroPermissionPrompt.hidden = true;
         }
       }
 
+      function showGyroPermissionCancelled() {
+        els.gyroStateLabel.textContent = '傾斜: 許可が必要です';
+        els.gyroStateLabel.style.color = 'var(--accent-amber)';
+        els.gyroPermissionMessage.textContent =
+          '許可がキャンセルされました。再度有効にするにはページを再読み込みしてください。';
+        els.gyroPermissionBtn.hidden = true;
+        els.gyroPermissionPrompt.hidden = false;
+        showToast('再度センサーを有効にするにはページを再読み込みしてください');
+      }
+
       async function requestGyroPermission() {
+        els.gyroPermissionBtn.disabled = true;
         try {
           const perm = await DeviceOrientationEvent.requestPermission();
           if (perm !== 'granted') {
-            els.gyroStateLabel.textContent = '傾斜: 許可されていません';
-            els.gyroStateLabel.style.color = 'var(--accent-amber)';
-            showToast('傾斜センサーの許可が得られませんでした');
+            showGyroPermissionCancelled();
             return;
           }
           window.addEventListener('deviceorientation', handleOrientation);
           state.gyroEnabled = true;
           els.gyroStateLabel.textContent = '傾斜: データ待機中...';
           els.gyroStateLabel.style.color = 'var(--text-muted)';
+          els.gyroPermissionPrompt.hidden = true;
         } catch (err) {
-          els.gyroStateLabel.textContent = '傾斜: 利用できません';
-          els.gyroStateLabel.style.color = 'var(--accent-red)';
-          showToast('傾斜センサーを開始できませんでした');
+          showGyroPermissionCancelled();
         }
       }
 
@@ -1893,17 +1936,11 @@
         els.gyroStateLabel.style.color = 'var(--text-muted)';
         if (typeof DeviceOrientationEvent.requestPermission !== 'function') return;
 
-        els.gyroStateLabel.textContent = '傾斜: 初回操作で許可を確認';
-        let permissionRequested = false;
-        const requestPermissionFromGesture = () => {
-          if (permissionRequested) return;
-          permissionRequested = true;
-          document.removeEventListener('click', requestPermissionFromGesture, true);
-          document.removeEventListener('keydown', requestPermissionFromGesture);
-          requestGyroPermission();
-        };
-        document.addEventListener('click', requestPermissionFromGesture, { once: true, capture: true });
-        document.addEventListener('keydown', requestPermissionFromGesture, { once: true });
+        els.gyroStateLabel.textContent = '傾斜: 許可が必要です';
+        els.gyroPermissionBtn.addEventListener('click', requestGyroPermission);
+        window.setTimeout(() => {
+          if (!state.gyroDataReceived) els.gyroPermissionPrompt.hidden = false;
+        }, 800);
       }
 
       els.zeroGyroBtn.addEventListener('click', () => {
