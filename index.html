@@ -1851,9 +1851,11 @@
       // ======================================================================
       function handleOrientation(e) {
         if (!Number.isFinite(e.beta) || !Number.isFinite(e.gamma)) return;
+        const pitch = e.beta - 90;
+        const roll = pitch > 0 ? -e.gamma : e.gamma;
         state.gyroEnabled = true;
-        state.rawRoll = Math.max(-45, Math.min(45, e.gamma));
-        state.rawPitch = Math.max(-45, Math.min(45, e.beta - 90));
+        state.rawRoll = Math.max(-45, Math.min(45, roll));
+        state.rawPitch = Math.max(-45, Math.min(45, pitch));
         els.gyroStateLabel.textContent = '傾斜: センサー稼働中';
         els.gyroStateLabel.style.color = 'var(--accent-green)';
         els.enableGyroBtn.classList.add('active');
