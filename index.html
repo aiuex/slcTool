@@ -1843,26 +1843,28 @@
       });
 
       // ======================================================================
-      // 傾斜センサー (DeviceOrientationEvent)
+      // 傾斜センサー (DeviceMotionEvent)
       // ======================================================================
-      function getTiltAngles(beta, gamma) {
-        // beta/gammaから重力方向を求め、重力軸まわりのgamma変化をROLLに混ぜない。
-        const betaRad = (beta * Math.PI) / 180;
-        const gammaRad = (gamma * Math.PI) / 180;
-        const gravityX = Math.cos(betaRad) * Math.sin(gammaRad);
-        const gravityY = -Math.sin(betaRad);
-        const gravityZ = -Math.cos(betaRad) * Math.cos(gammaRad);
-
+      function getTiltAnglesFromGravity(acceleration) {
         return {
-          roll: (Math.atan2(gravityX, -gravityY) * 180) / Math.PI,
-          pitch: (Math.atan2(gravityZ, -gravityY) * 180) / Math.PI
+          roll: (Math.atan2(-acceleration.x, acceleration.y) * 180) / Math.PI,
+          pitch: (Math.atan2(-acceleration.z, acceleration.y) * 180) / Math.PI
         };
       }
 
-      function handleOrientation(e) {
-        if (!Number.isFinite(e.beta) || !Number.isFinite(e.gamma)) return;
+      function handleMotion(e) {
+        const acceleration = e.accelerationIncludingGravity;
+        if (
+          !acceleration ||
+          !Number.isFinite(acceleration.x) ||
+          !Number.isFinite(acceleration.y) ||
+          !Number.isFinite(acceleration.z) ||
+          Math.hypot(acceleration.x, acceleration.y, acceleration.z) < 1
+        ) {
+          return;
+        }
 
-        const tilt = getTiltAngles(e.beta, e.gamma);
+        const tilt = getTiltAnglesFromGravity(acceleration);
         state.gyroEnabled = true;
         state.rawRoll = Math.max(-45, Math.min(45, tilt.roll));
         state.rawPitch = Math.max(-45, Math.min(45, tilt.pitch));
@@ -1873,17 +1875,18 @@
 
       els.enableGyroBtn.addEventListener('click', async () => {
         try {
-          if (
-            typeof DeviceOrientationEvent !== 'undefined' &&
-            typeof DeviceOrientationEvent.requestPermission === 'function'
-          ) {
-            const perm = await DeviceOrientationEvent.requestPermission();
-            if (perm !== 'granted') {
+          if (typeof DeviceMotionEvent === 'undefined') {
+            showToast('この環境では重力センサーを利用できません');
+            return;
+          }
+          if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            const permission = await DeviceMotionEvent.requestPermission();
+            if (permission !== 'granted') {
               showToast('傾斜センサーの許可が得られませんでした（HTTPS環境かご確認ください）');
               return;
             }
           }
-          window.addEventListener('deviceorientation', handleOrientation);
+          window.addEventListener('devicemotion', handleMotion);
           els.gyroStateLabel.textContent = '傾斜: データ待機中...';
           showToast('傾斜センサーを有効化しました');
         } catch (err) {
