@@ -768,8 +768,8 @@
         <button type="button" id="demoModeBtn" class="top-btn" title="カメラなしの15m模擬受光器映像切替">
           <span>🎛️ デモ映像</span>
         </button>
-        <button type="button" id="expandHudBtn" class="top-btn" title="操作パネルを折りたたんで画面拡大">
-          <span id="expandHudLabel">⛶ HUD拡大</span>
+        <button type="button" id="expandHudBtn" class="top-btn" title="操作パネルを折りたたんでカメラ映像を拡大">
+          <span id="expandHudLabel">⛶ カメラ映像拡大</span>
         </button>
       </div>
     </div>
@@ -2053,7 +2053,7 @@
       els.expandHudBtn.addEventListener('click', () => {
         const expanded = document.body.classList.toggle('hud-expanded');
         els.expandHudBtn.classList.toggle('is-active', expanded);
-        els.expandHudLabel.textContent = expanded ? '↙ パネル表示' : '⛶ HUD拡大';
+        els.expandHudLabel.textContent = expanded ? '↙ パネル表示' : '⛶ カメラ映像拡大';
       });
 
       els.mirrorToggleBtn.addEventListener('click', () => {
