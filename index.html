@@ -1847,31 +1847,13 @@
       });
 
       // ======================================================================
-      // 傾斜センサー (DeviceMotionEvent)
+      // 傾斜センサー (DeviceOrientationEvent)
       // ======================================================================
-      function getTiltAnglesFromGravity(acceleration) {
-        return {
-          roll: (Math.atan2(-acceleration.x, acceleration.y) * 180) / Math.PI,
-          pitch: (Math.atan2(-acceleration.z, acceleration.y) * 180) / Math.PI
-        };
-      }
-
-      function handleMotion(e) {
-        const acceleration = e.accelerationIncludingGravity;
-        if (
-          !acceleration ||
-          !Number.isFinite(acceleration.x) ||
-          !Number.isFinite(acceleration.y) ||
-          !Number.isFinite(acceleration.z) ||
-          Math.hypot(acceleration.x, acceleration.y, acceleration.z) < 1
-        ) {
-          return;
-        }
-
-        const tilt = getTiltAnglesFromGravity(acceleration);
+      function handleOrientation(e) {
+        if (!Number.isFinite(e.beta) || !Number.isFinite(e.gamma)) return;
         state.gyroEnabled = true;
-        state.rawRoll = Math.max(-45, Math.min(45, tilt.roll));
-        state.rawPitch = Math.max(-45, Math.min(45, tilt.pitch));
+        state.rawRoll = Math.max(-45, Math.min(45, e.gamma));
+        state.rawPitch = Math.max(-45, Math.min(45, e.beta - 90));
         els.gyroStateLabel.textContent = '傾斜: センサー稼働中';
         els.gyroStateLabel.style.color = 'var(--accent-green)';
         els.enableGyroBtn.classList.add('active');
@@ -1879,18 +1861,18 @@
 
       els.enableGyroBtn.addEventListener('click', async () => {
         try {
-          if (typeof DeviceMotionEvent === 'undefined') {
-            showToast('この環境では重力センサーを利用できません');
+          if (typeof DeviceOrientationEvent === 'undefined') {
+            showToast('この環境では傾斜センサーを利用できません');
             return;
           }
-          if (typeof DeviceMotionEvent.requestPermission === 'function') {
-            const permission = await DeviceMotionEvent.requestPermission();
+          if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const permission = await DeviceOrientationEvent.requestPermission();
             if (permission !== 'granted') {
               showToast('傾斜センサーの許可が得られませんでした（HTTPS環境かご確認ください）');
               return;
             }
           }
-          window.addEventListener('devicemotion', handleMotion);
+          window.addEventListener('deviceorientation', handleOrientation);
           els.gyroStateLabel.textContent = '傾斜: データ待機中...';
           showToast('傾斜センサーを有効化しました');
         } catch (err) {
