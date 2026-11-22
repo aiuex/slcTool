@@ -511,35 +511,6 @@
       color: var(--text-primary);
     }
 
-    /* 光学計算テレメトリカード */
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 7px;
-      margin-top: 10px;
-    }
-
-    .metric-box {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      padding: 8px 9px;
-    }
-
-    .metric-label {
-      font-size: 10.5px;
-      color: var(--text-muted);
-      display: block;
-      margin-bottom: 2px;
-    }
-
-    .metric-val {
-      font-family: var(--font-mono);
-      font-size: 13.5px;
-      font-weight: 800;
-      color: var(--text-primary);
-    }
-
     /* 物理オフセットパッド */
     .offset-card {
       background: var(--bg-card);
@@ -789,7 +760,7 @@
         <!-- 左上リアルタイムステータス -->
         <div class="hud-top-left">
           <span class="hud-chip" id="hudStatusChip">CAM: インカメラ | 正像 | 5.0x</span>
-          <span class="hud-chip" id="hudGeomChip">L: 15.0m | W: 30mm | パララックス: 0.095°</span>
+          <span class="hud-chip" id="hudGeomChip">L: 15.0m | W: 32mm</span>
           <span class="hud-chip ok" id="hudLevelChip">傾斜: R 0.0° / P 0.0°</span>
         </div>
 
@@ -921,21 +892,6 @@
           <button type="button" id="fovIncBtn" class="step-btn">+1°</button>
         </div>
 
-        <!-- リアルタイム光学スケール算出結果 -->
-        <div class="metrics-grid">
-          <div class="metric-box">
-            <span class="metric-label">パララックス角度差</span>
-            <span id="metricParallax" class="metric-val">0.095°</span>
-          </div>
-          <div class="metric-box">
-            <span class="metric-label">距離Lでのスケール</span>
-            <span id="metricScale" class="metric-val">9.96 mm/px</span>
-          </div>
-          <div class="metric-box">
-            <span class="metric-label">画面上の筐体幅目安</span>
-            <span id="metricApparentW" class="metric-val">15.1 px</span>
-          </div>
-        </div>
       </section>
 
       <!-- 3. 物理オフセット (ΔX, ΔY mm) 動的照準補正 -->
@@ -1168,10 +1124,6 @@
         fovDecBtn: document.getElementById('fovDecBtn'),
         fovIncBtn: document.getElementById('fovIncBtn'),
 
-        metricParallax: document.getElementById('metricParallax'),
-        metricScale: document.getElementById('metricScale'),
-        metricApparentW: document.getElementById('metricApparentW'),
-
         dxBadge: document.getElementById('dxBadge'),
         dyBadge: document.getElementById('dyBadge'),
         resetOffsetBtn: document.getElementById('resetOffsetBtn'),
@@ -1226,13 +1178,6 @@
         const mmPerPxBase = sceneFullWidthMm1x / Math.max(1, viewWidthPx);
         const mmPerPxZoomed = mmPerPxBase / state.zoom;
 
-        // 1920px基準でのmm/px（スペック表示目安）
-        const mmPerPx1920 = sceneFullWidthMm1x / 1920;
-
-        // パララックス角度差 θ = atan(sqrt(ΔX^2 + ΔY^2) / L_mm)
-        const radialOffsetMm = Math.hypot(state.offsetXmm, state.offsetYmm);
-        const parallaxDeg = (Math.atan2(radialOffsetMm, L_mm) * 180) / Math.PI;
-
         // 画面上での受光器筐体幅 W の見かけ幅 (px)
         const apparentWidthPx = state.housingWidthMm / Math.max(0.0001, mmPerPxZoomed);
 
@@ -1245,8 +1190,6 @@
           L_mm,
           sceneFullWidthMm1x,
           mmPerPxZoomed,
-          mmPerPx1920,
-          parallaxDeg,
           apparentWidthPx,
           shiftXPx,
           shiftYPx
@@ -1446,7 +1389,7 @@
         targetCtx.font = 'bold 10.5px ui-monospace, monospace';
         targetCtx.textAlign = 'center';
         targetCtx.fillText(
-          `W=${state.housingWidthMm}mm (${geom.apparentWidthPx.toFixed(1)}px)`,
+          `W=${state.housingWidthMm}mm`,
           targetX,
           targetY - bracketHalfH - 7
         );
@@ -1631,7 +1574,7 @@
           targetCtx.fillText(`LC-ALIGN 15M | ${nowStr}`, 10, 16);
           targetCtx.fillStyle = '#f8fafc';
           targetCtx.fillText(
-            `L:${state.distanceM.toFixed(1)}m W:${state.housingWidthMm}mm ZOOM:${state.zoom.toFixed(1)}x Δ(${state.offsetXmm},${state.offsetYmm})mm θ:${geom.parallaxDeg.toFixed(3)}°`,
+            `L:${state.distanceM.toFixed(1)}m W:${state.housingWidthMm}mm ZOOM:${state.zoom.toFixed(1)}x Δ(${state.offsetXmm},${state.offsetYmm})mm`,
             10,
             32
           );
@@ -1658,7 +1601,7 @@
             : 'CAM: 背面カメラ';
         const mirName = state.isMirrored ? 'ミラー' : '正像';
         els.hudStatusChip.textContent = `${camName} | ${mirName} | ${state.zoom.toFixed(1)}x`;
-        els.hudGeomChip.textContent = `L:${state.distanceM.toFixed(1)}m | W:${state.housingWidthMm}mm | θ:${geom.parallaxDeg.toFixed(3)}°`;
+        els.hudGeomChip.textContent = `L:${state.distanceM.toFixed(1)}m | W:${state.housingWidthMm}mm`;
 
         const maxTilt = Math.max(Math.abs(roll), Math.abs(pitch));
         els.hudLevelChip.className = `hud-chip ${maxTilt <= 0.5 ? 'ok' : maxTilt <= 1.5 ? 'warn' : 'err'}`;
@@ -1683,11 +1626,6 @@
 
         els.dxBadge.textContent = `${state.offsetXmm > 0 ? '+' : ''}${state.offsetXmm} mm`;
         els.dyBadge.textContent = `${state.offsetYmm > 0 ? '+' : ''}${state.offsetYmm} mm`;
-
-        // 光学算出メトリクス
-        els.metricParallax.textContent = `${geom.parallaxDeg.toFixed(3)}°`;
-        els.metricScale.textContent = `${geom.mmPerPxZoomed.toFixed(2)} mm/px`;
-        els.metricApparentW.textContent = `${geom.apparentWidthPx.toFixed(1)} px`;
 
         // プリセット選択ハイライト同期
         document.querySelectorAll('#zoomPresetRow .preset-chip').forEach((b) => {
