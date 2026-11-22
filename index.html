@@ -346,11 +346,42 @@
       gap: 12px;
     }
 
+    .settings-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .settings-tab {
+      min-width: 0;
+      min-height: 46px;
+      padding: 5px 3px;
+      border: 1px solid var(--border-strong);
+      border-radius: 9px;
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.2;
+      cursor: pointer;
+    }
+
+    .settings-tab[aria-selected="true"] {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 229, 255, 0.16);
+      color: var(--accent-cyan);
+    }
+
     .panel {
       background: var(--bg-panel);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
       padding: 14px;
+    }
+
+    .panel[hidden] {
+      display: none;
     }
 
     .panel-head {
@@ -626,6 +657,75 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
+
+    @media (max-width: 767px) {
+      html,
+      body {
+        height: 100dvh;
+        min-height: 0;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .app-header {
+        position: relative;
+        flex: 0 0 auto;
+      }
+
+      .main-grid {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+        width: 100%;
+        padding: 8px;
+        gap: 8px;
+        overflow: hidden;
+      }
+
+      .viewport-column {
+        flex: 1 1 auto;
+        min-height: 0;
+        gap: 8px;
+      }
+
+      .viewport-stage {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 0;
+        max-height: none;
+        aspect-ratio: auto;
+      }
+
+      body.hud-expanded .viewport-stage {
+        height: auto;
+      }
+
+      .quick-dock {
+        flex: 0 0 auto;
+      }
+
+      .controls-column {
+        flex: 0 0 min(40dvh, 340px);
+        min-height: 0;
+        max-height: 40dvh;
+        gap: 6px;
+        overflow: hidden;
+      }
+
+      .controls-column .panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        padding: 10px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -701,10 +801,25 @@
       </div>
     </section>
 
-    <!-- 右（モバイル下部）：ズーム・筐体幅W・距離L・物理オフセット設定 -->
+    <!-- 設定カテゴリ選択と操作パネル -->
     <div class="controls-column">
+      <div class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
+        <button type="button" class="settings-tab" id="settingsTabZoom" role="tab" aria-controls="settingsPanelZoom" aria-selected="true" tabindex="0">
+          ① ズーム
+        </button>
+        <button type="button" class="settings-tab" id="settingsTabGeometry" role="tab" aria-controls="settingsPanelGeometry" aria-selected="false" tabindex="-1">
+          ② 寸法・距離
+        </button>
+        <button type="button" class="settings-tab" id="settingsTabOffset" role="tab" aria-controls="settingsPanelOffset" aria-selected="false" tabindex="-1">
+          ③ オフセット
+        </button>
+        <button type="button" class="settings-tab" id="settingsTabDisplay" role="tab" aria-controls="settingsPanelDisplay" aria-selected="false" tabindex="-1">
+          ④ 傾斜・表示
+        </button>
+      </div>
+
       <!-- 1. デジタルズーム＆10倍ルーペ設定 -->
-      <section class="panel" aria-label="デジタルズーム設定">
+      <section class="panel" id="settingsPanelZoom" role="tabpanel" aria-labelledby="settingsTabZoom" tabindex="0" aria-label="デジタルズーム設定">
         <div class="panel-head">
           <h2 class="panel-title">1. デジタルズーム (最大10.0x / 15m対応)</h2>
           <span id="zoomBadge" class="val-badge">5.0x</span>
@@ -726,7 +841,7 @@
       </section>
 
       <!-- 2. 既知の筐体幅 W・距離 L・カメラ画角 FOV -->
-      <section class="panel" aria-label="既知の筐体幅と距離設定">
+      <section class="panel" id="settingsPanelGeometry" role="tabpanel" aria-labelledby="settingsTabGeometry" tabindex="0" aria-label="既知の筐体幅と距離設定" hidden>
         <div class="panel-head">
           <h2 class="panel-title">2. 既知の筐体幅 (W) ＆ 投受光間距離 (L)</h2>
           <span id="widthBadge" class="val-badge">W: 30mm</span>
@@ -794,7 +909,7 @@
       </section>
 
       <!-- 3. 物理オフセット (ΔX, ΔY mm) 動的照準補正 -->
-      <section class="panel" aria-label="物理オフセット補正">
+      <section class="panel" id="settingsPanelOffset" role="tabpanel" aria-labelledby="settingsTabOffset" tabindex="0" aria-label="物理オフセット補正" hidden>
         <div class="panel-head">
           <h2 class="panel-title">3. カメラ〜投光中心の物理ズレ補正 (mm)</h2>
           <button type="button" id="resetOffsetBtn" class="step-btn" style="width:auto; min-height:36px; font-size:11.5px;">
@@ -833,7 +948,7 @@
       </section>
 
       <!-- 4. レチクル色・ルーペPIP・傾斜水準器 -->
-      <section class="panel" aria-label="照準色と傾斜水準器設定">
+      <section class="panel" id="settingsPanelDisplay" role="tabpanel" aria-labelledby="settingsTabDisplay" tabindex="0" aria-label="照準色と傾斜水準器設定" hidden>
         <div class="panel-head">
           <h2 class="panel-title">4. 高視認レチクル色 ＆ 傾斜水準器</h2>
           <span id="gyroStateLabel" style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">
@@ -1804,6 +1919,39 @@
       // ======================================================================
       // コントロールイベント登録
       // ======================================================================
+      const settingsTabs = Array.from(document.querySelectorAll('.settings-tab'));
+      const settingsPanels = settingsTabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls')));
+
+      function activateSettingsTab(selectedIndex, moveFocus) {
+        settingsTabs.forEach((tab, index) => {
+          const selected = index === selectedIndex;
+          tab.setAttribute('aria-selected', String(selected));
+          tab.tabIndex = selected ? 0 : -1;
+          settingsPanels[index].hidden = !selected;
+        });
+        if (moveFocus) settingsTabs[selectedIndex].focus();
+      }
+
+      settingsTabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => activateSettingsTab(index, false));
+        tab.addEventListener('keydown', (event) => {
+          let nextIndex = index;
+          if (event.key === 'ArrowRight') {
+            nextIndex = (index + 1) % settingsTabs.length;
+          } else if (event.key === 'ArrowLeft') {
+            nextIndex = (index - 1 + settingsTabs.length) % settingsTabs.length;
+          } else if (event.key === 'Home') {
+            nextIndex = 0;
+          } else if (event.key === 'End') {
+            nextIndex = settingsTabs.length - 1;
+          } else {
+            return;
+          }
+          event.preventDefault();
+          activateSettingsTab(nextIndex, true);
+        });
+      });
+
       els.startCamBtn.addEventListener('click', startCamera);
       els.startDemoBtn.addEventListener('click', startDemoMode);
 
