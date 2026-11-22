@@ -1011,7 +1011,6 @@
       'use strict';
 
       const STORAGE_KEY = 'lc_align_15m_settings_v1';
-      const MIRROR_DEFAULT_VERSION = 1;
 
       // ======================================================================
       // アプリケーション状態
@@ -1019,7 +1018,7 @@
       const state = {
         facingMode: 'user',       // 'user' (インカメラ) | 'environment' (背面カメラ)
         isMirrored: true,         // 現在のカメラ表示方向
-        mirrorPreference: true,   // デフォルトは鏡像表示
+        mirrorPreference: true,   // このセッションでのミラー設定
         zoom: 5.0,                // デジタルズーム倍率 (1.0 〜 10.0)
         panX: 0,                  // ビューポートパンX (CSS px)
         panY: 0,                  // ビューポートパンY (CSS px)
@@ -1059,26 +1058,14 @@
           const raw = localStorage.getItem(STORAGE_KEY);
           if (!raw) return;
           const s = JSON.parse(raw);
-          const savedMirrorVersion = Number.isInteger(s.mirrorDefaultVersion)
-            ? s.mirrorDefaultVersion
-            : 0;
-          const shouldMigrateMirrorDefault = savedMirrorVersion < MIRROR_DEFAULT_VERSION;
           if (typeof s.housingWidthMm === 'number') state.housingWidthMm = s.housingWidthMm;
           if (typeof s.distanceM === 'number') state.distanceM = s.distanceM;
           if (typeof s.fovDeg === 'number') state.fovDeg = s.fovDeg;
           if (typeof s.offsetXmm === 'number') state.offsetXmm = s.offsetXmm;
           if (typeof s.offsetYmm === 'number') state.offsetYmm = s.offsetYmm;
           if (typeof s.reticleColor === 'string') state.reticleColor = s.reticleColor;
-          if (
-            typeof s.isMirrored === 'boolean' &&
-            !shouldMigrateMirrorDefault
-          ) {
-            state.mirrorPreference = s.isMirrored;
-          }
-          state.isMirrored = state.mirrorPreference;
           if (typeof s.showLoupe === 'boolean') state.showLoupe = s.showLoupe;
           if (typeof s.showGrid === 'boolean') state.showGrid = s.showGrid;
-          if (shouldMigrateMirrorDefault) saveSettings();
         } catch (e) {
           // 無視
         }
@@ -1095,8 +1082,6 @@
               offsetXmm: state.offsetXmm,
               offsetYmm: state.offsetYmm,
               reticleColor: state.reticleColor,
-              isMirrored: state.mirrorPreference,
-              mirrorDefaultVersion: MIRROR_DEFAULT_VERSION,
               showLoupe: state.showLoupe,
               showGrid: state.showGrid
             })
@@ -1884,6 +1869,8 @@
             showToast('傾斜センサーの許可が得られませんでした');
             return;
           }
+          window.addEventListener('deviceorientation', handleOrientation);
+          state.gyroEnabled = true;
           els.gyroStateLabel.textContent = '傾斜: データ待機中...';
           els.gyroStateLabel.style.color = 'var(--text-muted)';
         } catch (err) {
@@ -1911,11 +1898,11 @@
         const requestPermissionFromGesture = () => {
           if (permissionRequested) return;
           permissionRequested = true;
-          document.removeEventListener('pointerdown', requestPermissionFromGesture);
+          document.removeEventListener('click', requestPermissionFromGesture, true);
           document.removeEventListener('keydown', requestPermissionFromGesture);
           requestGyroPermission();
         };
-        document.addEventListener('pointerdown', requestPermissionFromGesture, { once: true });
+        document.addEventListener('click', requestPermissionFromGesture, { once: true, capture: true });
         document.addEventListener('keydown', requestPermissionFromGesture, { once: true });
       }
 
